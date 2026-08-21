@@ -80,9 +80,27 @@ pytest -q
 
 自动测试全部通过后再准备真实数据。
 
-## 4. 原始数据如何存放
+## 4. 下载和存放原始数据
 
-### 4.1 目录和文件名
+### 4.1 一键下载（推荐）
+
+项目提供了无需额外 Python 依赖的下载脚本。默认下载全部 9 个数据集，自动创建目录，
+并在写入最终文件前校验 `date` 列、行数和特征列数：
+
+```bash
+./download_datasets.py
+```
+
+脚本支持断点续传；再次运行时会校验并跳过已有的完整文件。只下载部分数据集时使用：
+
+```bash
+./download_datasets.py --dataset ETTh1 Weather
+```
+
+默认依次尝试 THUML 官方 Hugging Face 仓库及其镜像，ETT 数据还会优先使用原始
+ETDataset 仓库。网络中断后直接重新执行相同命令即可；使用 `--force` 可强制覆盖下载。
+
+### 4.2 目录和文件名
 
 原始数据必须按下面的结构存放：
 
@@ -109,7 +127,7 @@ datasets/raw/
 
 即使使用备用文件名，也应放在对应的标准目录下，例如 `datasets/raw/ILI/Illness.csv`。
 
-### 4.2 CSV 格式要求
+### 4.3 CSV 格式要求
 
 所有数据集均使用宽表 CSV：
 
@@ -143,7 +161,7 @@ date,feature_1,feature_2,feature_3
 
 “特征列数”不包含 `date` 列。权威配置位于 [`datasets/catalog.json`](datasets/catalog.json)。
 
-### 4.3 放入数据后检查库存
+### 4.4 下载后检查库存
 
 ```bash
 python3 pre_experiments/check_inventory.py
@@ -488,4 +506,3 @@ pre_experiments/results/saturation/
 11. 最后再决定是否引入缺失的 3 个 2025 Backbone。
 
 更详细的统计定义和公平性约束见 [`pre_experiments/README.md`](pre_experiments/README.md)。
-

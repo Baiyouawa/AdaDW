@@ -4,6 +4,17 @@ The nine experiment entries are ETTh1, ETTh2, ETTm1, ETTm2, Weather,
 Electricity, ILI, ExchangeRate and Traffic. `catalog.json` is the
 single source of truth for names, dimensions, frequencies and split policies.
 
+Download all nine datasets from the project root with:
+
+```bash
+./download_datasets.py
+```
+
+The downloader resumes partial transfers, skips existing valid files, falls
+back to a Hugging Face mirror and validates the CSV dimensions before replacing
+the destination. Use `./download_datasets.py --help` to select individual
+datasets or override the repository endpoint.
+
 There is one unresolved identity conflict: DropoutTS and the standard LTSF
 protocol use a 321-channel Electricity client-consumption series, while the
 paper draft describes the distinct household power/sub-metering dataset. The
