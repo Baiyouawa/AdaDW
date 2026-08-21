@@ -1,0 +1,41 @@
+[workspace]
+name = "adawd-preexperiments"
+version = "0.1.0"
+description = "Reproducible AdaWD-TS dataset and capacity pre-experiments"
+authors = ["AdaWD-TS contributors"]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[system-requirements]
+cuda = "12.0"
+
+[dependencies]
+python = "3.10.*"
+pip = ">=24"
+
+[pypi-dependencies]
+numpy = ">=1.24,<3"
+pandas = ">=2.0,<3"
+scipy = ">=1.10,<2"
+matplotlib = ">=3.7,<4"
+torch = ">=2.0,<3"
+easy-torch = "==1.3.3"
+easydict = ">=1.10"
+einops = ">=0.7"
+packaging = ">=23"
+setproctitle = ">=1.3"
+tensorboard = ">=2.14"
+tqdm = ">=4.65"
+pytest = ">=7,<10"
+
+[tasks]
+install-check = { cmd = "python -c \"import torch; print('PyTorch:', torch.__version__); print('CUDA:', torch.cuda.is_available()); print('GPU count:', torch.cuda.device_count())\"", description = "Check the Pixi training environment and CUDA visibility" }
+test = { cmd = "pytest -q", description = "Run the automated test suite" }
+download-datasets = { cmd = "python download_datasets.py", description = "Download and validate all nine raw datasets" }
+inventory = { cmd = "python pre_experiments/check_inventory.py", description = "Show dataset and Backbone availability" }
+prepare-datasets = { cmd = "python pre_experiments/run_preexperiments.py dataset --prepare-only", description = "Strictly prepare all registered datasets" }
+preexp-dataset = { cmd = "python pre_experiments/run_preexperiments.py dataset --download", description = "Download, prepare, profile and plot registered datasets" }
+preexp-depth-plan = { cmd = "python pre_experiments/run_preexperiments.py depth --dry-run", description = "Print the default pilot depth sweep without training" }
+preexp-depth = { cmd = "python pre_experiments/run_preexperiments.py depth", description = "Run the default pilot depth pre-experiment" }
+preexp-width-plan = { cmd = "python pre_experiments/run_preexperiments.py width --dry-run", description = "Print the default pilot width sweep without training" }
+preexp-width = { cmd = "python pre_experiments/run_preexperiments.py width", description = "Run the default pilot width pre-experiment" }

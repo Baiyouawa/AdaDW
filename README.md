@@ -24,6 +24,8 @@ WPMMixer、TimeFilter 和 MultiPatchFormer 在 DropoutTS 中没有实现，目�
 
 ```text
 AdaWD/
+├── pixi.toml                        # Pixi 环境与一键任务
+├── pixi.lock                        # 锁定的跨机器依赖版本
 ├── Baselines/                       # BasicTS 运行核心和 Backbone
 │   ├── basicts/models/              # 5 个现有模型和 3 个缺失占位
 │   └── registry.json                # 模型深度、宽度及 RAW 配置
@@ -45,40 +47,53 @@ AdaWD/
 cd /home/devcontainers/ICLR/Exp/AdaWD
 ```
 
-## 3. 安装运行环境
+## 3. Pixi 运行环境与一键任务
 
-建议使用独立虚拟环境：
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[training,test]"
-```
-
-如果机器需要指定 CUDA 版本，请先安装与本机 CUDA 匹配的 PyTorch，再执行最后一条安装命令。
-
-检查环境：
+本项目统一使用 Pixi 管理 Python、PyTorch、CUDA 运行库和实验依赖，不再需要手工创建
+venv 或执行 `pip install`。首次运行：
 
 ```bash
-python - <<'PY'
-import numpy
-import pandas
-import scipy
-import torch
-
-print("NumPy:", numpy.__version__)
-print("Pandas:", pandas.__version__)
-print("SciPy:", scipy.__version__)
-print("PyTorch:", torch.__version__)
-print("CUDA available:", torch.cuda.is_available())
-print("GPU count:", torch.cuda.device_count())
-PY
-
-pytest -q
+pixi install
 ```
 
-自动测试全部通过后再准备真实数据。
+`pixi.lock` 会确保不同机器使用相同依赖版本。检查 PyTorch、CUDA 和自动测试：
+
+```bash
+pixi run install-check
+pixi run test
+```
+
+三个主要一键任务是：
+
+```bash
+# 下载、严格预处理、画像并绘制全部 9 个数据集
+pixi run preexp-dataset
+
+# 深度预实验：默认 ETTh1 + PatchTST + horizon 96 + seed 42
+pixi run preexp-depth
+
+# 宽度预实验：默认 ETTh1 + PatchTST + horizon 96 + seed 42
+pixi run preexp-width
+```
+
+正式训练前可只查看容量计划：
+
+```bash
+pixi run preexp-depth-plan
+pixi run preexp-width-plan
+```
+
+任务支持追加参数。例如，在 ILI 上用 TimesNet、预测 24 步、三个种子运行深度实验：
+
+```bash
+pixi run preexp-depth \
+  --dataset ILI \
+  --model TimesNet \
+  --horizon 24 \
+  --seeds 42 43 44
+```
+
+可用 `pixi task list` 查看全部任务。自动测试通过后再开始正式实验。
 
 ## 4. 下载和存放原始数据
 
@@ -88,13 +103,13 @@ pytest -q
 并在写入最终文件前校验 `date` 列、行数和特征列数：
 
 ```bash
-./download_datasets.py
+pixi run download-datasets
 ```
 
 脚本支持断点续传；再次运行时会校验并跳过已有的完整文件。只下载部分数据集时使用：
 
 ```bash
-./download_datasets.py --dataset ETTh1 Weather
+pixi run download-datasets --dataset ETTh1 Weather
 ```
 
 默认依次尝试 THUML 官方 Hugging Face 仓库及其镜像，ETT 数据还会优先使用原始
@@ -164,7 +179,7 @@ date,feature_1,feature_2,feature_3
 ### 4.4 下载后检查库存
 
 ```bash
-python3 pre_experiments/check_inventory.py
+pixi run inventory
 ```
 
 数据存在时，对应状态应从 `missing_data` 变为 `raw_available`。
@@ -174,23 +189,17 @@ python3 pre_experiments/check_inventory.py
 处理单个数据集：
 
 ```bash
-python3 pre_experiments/prepare_dataset.py \
+pixi run python pre_experiments/prepare_dataset.py \
   --dataset ETTh1 \
   --strict-shape
 ```
 
 `--strict-shape` 会在时间点数量或特征数量不符合配置时直接报错。调试自定义数据时可以暂时去掉，正式实验建议保留。
 
-批量处理 9 个数据集：
+一键严格处理 9 个数据集：
 
 ```bash
-set -euo pipefail
-
-for dataset in ETTh1 ETTh2 ETTm1 ETTm2 Weather Electricity ILI ExchangeRate Traffic; do
-  python3 pre_experiments/prepare_dataset.py \
-    --dataset "$dataset" \
-    --strict-shape
-done
+pixi run prepare-datasets
 ```
 
 每个数据集会生成：
@@ -206,7 +215,7 @@ datasets/processed/ETTh1/
 └── meta.json
 ```
 
-再次运行 `python3 pre_experiments/check_inventory.py`，状态应显示为 `processed_available`。
+再次运行 `pixi run inventory`，状态应显示为 `processed_available`。
 
 ## 6. 数据特性预实验
 
@@ -222,13 +231,13 @@ M_i = mean(m_peak, m_band, m_channel)
 默认优先读取完整原始 CSV：
 
 ```bash
-python3 pre_experiments/profile_dataset.py --dataset ETTh1
+pixi run python pre_experiments/profile_dataset.py --dataset ETTh1
 ```
 
 如果希望严格按 train/validation/test 边界画像，读取处理后的 NPY：
 
 ```bash
-python3 pre_experiments/profile_dataset.py \
+pixi run python pre_experiments/profile_dataset.py \
   --dataset ETTh1 \
   --processed
 ```
@@ -236,7 +245,7 @@ python3 pre_experiments/profile_dataset.py \
 限制窗口数的调试命令：
 
 ```bash
-python3 pre_experiments/profile_dataset.py \
+pixi run python pre_experiments/profile_dataset.py \
   --dataset ETTh1 \
   --window-size 96 \
   --stride 24 \
@@ -246,21 +255,21 @@ python3 pre_experiments/profile_dataset.py \
 Electricity 和 Traffic 默认均匀选择 64 个通道。正式敏感性实验可运行全通道版本：
 
 ```bash
-python3 pre_experiments/profile_dataset.py \
+pixi run python pre_experiments/profile_dataset.py \
   --dataset Electricity \
   --all-channels \
   --output-dir pre_experiments/results/profiles/Electricity_all_channels
 ```
 
-### 6.2 批量画像
+### 6.2 一键数据集预实验
 
 ```bash
-set -euo pipefail
-
-for dataset in ETTh1 ETTh2 ETTm1 ETTm2 Weather Electricity ILI ExchangeRate Traffic; do
-  python3 pre_experiments/profile_dataset.py --dataset "$dataset"
-done
+pixi run preexp-dataset
 ```
+
+该任务按 `datasets/catalog.json` 顺序对全部数据集执行严格预处理、U/M 画像和诊断图绘制。
+只运行部分数据集时使用 `pixi run preexp-dataset --datasets ETTh1 Weather`。如需严格按
+train/validation/test 边界画像，追加 `--processed-profiles`。
 
 每个数据集生成：
 
@@ -273,7 +282,7 @@ pre_experiments/results/profiles/ETTh1/
 ### 6.3 绘图
 
 ```bash
-python3 pre_experiments/plot_profiles.py \
+pixi run python pre_experiments/plot_profiles.py \
   --profiles pre_experiments/results/profiles/ETTh1/windows.csv
 ```
 
@@ -283,7 +292,7 @@ python3 pre_experiments/plot_profiles.py \
 set -euo pipefail
 
 for dataset in ETTh1 ETTh2 ETTm1 ETTm2 Weather Electricity ILI ExchangeRate Traffic; do
-  python3 pre_experiments/plot_profiles.py \
+  pixi run python pre_experiments/plot_profiles.py \
     --profiles "pre_experiments/results/profiles/${dataset}/windows.csv"
 done
 ```
@@ -319,13 +328,8 @@ done
 ### 7.2 先检查计划，不训练
 
 ```bash
-python3 pre_experiments/run_capacity_sweep.py \
-  --dataset ETTh1 \
-  --model PatchTST \
-  --axis depth \
-  --horizon 96 \
-  --seeds 42 \
-  --dry-run
+pixi run preexp-depth-plan
+pixi run preexp-width-plan
 ```
 
 `--dry-run` 会列出全部 `run_id`、深度、宽度和种子，不创建训练结果。
@@ -337,7 +341,7 @@ python3 pre_experiments/run_capacity_sweep.py \
 运行 RAW：
 
 ```bash
-python3 pre_experiments/run_capacity_sweep.py \
+pixi run python pre_experiments/run_capacity_sweep.py \
   --dataset ETTh1 \
   --model PatchTST \
   --axis raw \
@@ -347,13 +351,23 @@ python3 pre_experiments/run_capacity_sweep.py \
   --all
 ```
 
-运行深度、宽度和二维实验：
+一键运行深度和宽度预实验：
+
+```bash
+pixi run preexp-depth
+pixi run preexp-width
+```
+
+两项任务默认采用 `ETTh1 + PatchTST + horizon=96 + seed=42 + GPU 0`，分别顺序执行
+`D={1,2,4,8}` 和 `W={1,2,4,8}`。编排器会先进行严格数据预处理。
+
+运行 RAW 和二维实验时仍可使用底层入口：
 
 ```bash
 set -euo pipefail
 
-for axis in depth width joint; do
-  python3 pre_experiments/run_capacity_sweep.py \
+for axis in raw joint; do
+  pixi run python pre_experiments/run_capacity_sweep.py \
     --dataset ETTh1 \
     --model PatchTST \
     --axis "$axis" \
@@ -367,7 +381,7 @@ done
 `--all` 表示顺序执行当前命令规划出的全部 run。也可以只运行 dry-run 列表中的某一项：
 
 ```bash
-python3 pre_experiments/run_capacity_sweep.py \
+pixi run python pre_experiments/run_capacity_sweep.py \
   --dataset ETTh1 \
   --model PatchTST \
   --axis depth \
@@ -382,14 +396,11 @@ python3 pre_experiments/run_capacity_sweep.py \
 ILI 不使用 96 作为预测长度。例如：
 
 ```bash
-python3 pre_experiments/run_capacity_sweep.py \
+pixi run preexp-depth \
   --dataset ILI \
   --model PatchTST \
-  --axis raw \
   --horizon 24 \
-  --seeds 42 \
-  --gpu 0 \
-  --all
+  --seeds 42
 ```
 
 ### 7.5 扩展到 5 个现有 Backbone
@@ -401,7 +412,7 @@ set -euo pipefail
 
 for model in Crossformer PatchTST TimesNet iTransformer TimeMixer; do
   for axis in raw depth width joint; do
-    python3 pre_experiments/run_capacity_sweep.py \
+    pixi run python pre_experiments/run_capacity_sweep.py \
       --dataset ETTh1 \
       --model "$model" \
       --axis "$axis" \
@@ -444,7 +455,7 @@ pre_experiments/results/runs/<run_id>/
 完成同一模型、数据集和预测长度下的候选容量实验后，运行：
 
 ```bash
-python3 pre_experiments/build_local_losses.py
+pixi run python pre_experiments/build_local_losses.py
 ```
 
 默认生成 `pre_experiments/results/local_losses.csv`。
@@ -452,7 +463,7 @@ python3 pre_experiments/build_local_losses.py
 调试时可以减少分析样本：
 
 ```bash
-python3 pre_experiments/build_local_losses.py \
+pixi run python pre_experiments/build_local_losses.py \
   --sample-stride 10 \
   --max-samples 1000 \
   --output pre_experiments/results/local_losses_debug.csv
@@ -463,7 +474,7 @@ python3 pre_experiments/build_local_losses.py \
 ## 10. 计算饱和深度和宽度
 
 ```bash
-python3 pre_experiments/analyze_saturation.py \
+pixi run python pre_experiments/analyze_saturation.py \
   --losses pre_experiments/results/local_losses.csv \
   --metric loss_mse \
   --epsilon 0.01
@@ -494,10 +505,10 @@ pre_experiments/results/saturation/
 ## 11. 推荐执行顺序
 
 1. 确认 Electricity 使用哪套数据；
-2. 放入 9 个原始 CSV；
-3. 运行库存检查和严格数据预处理；
-4. 完成 9 个数据集的 U/M 画像并检查指标是否退化；
-5. 安装 PyTorch，运行自动测试；
+2. 运行 `pixi install` 和 `pixi run test`；
+3. 运行 `pixi run preexp-dataset` 下载、预处理并画像 9 个数据集；
+4. 检查 U/M 指标是否退化；
+5. 运行深度和宽度任务的 plan；
 6. 完成 `ETTh1 + PatchTST + 96 + seed 42` 的完整闭环；
 7. 扩展到 5 个现有 Backbone；
 8. 扩展到其他数据集和预测长度；
