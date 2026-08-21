@@ -1,0 +1,37 @@
+{
+  "profiler": {
+    "ar_order": 4,
+    "ar_forecast_points": 8,
+    "ar_ridge": 0.001,
+    "peak_saturation_count": 8,
+    "peak_prominence_ratio": 0.05,
+    "peak_min_distance": 2,
+    "spectral_median_kernel": 5,
+    "frequency_bands": 6,
+    "epsilon": 1e-08,
+    "max_windows_per_segment": 512
+  },
+  "capacity": {
+    "depth_candidates": [1, 2, 4, 8],
+    "width_group_candidates": [1, 2, 4, 8],
+    "grid_depth_candidates": [2, 4, 8],
+    "grid_width_group_candidates": [2, 4, 8],
+    "saturation_tolerance": 0.01,
+    "seeds": [42, 43, 44]
+  },
+  "training": {
+    "epochs": 100,
+    "batch_size": 64,
+    "learning_rate": 0.0002,
+    "weight_decay": 0.0005,
+    "early_stopping_patience": 10,
+    "metrics": ["MAE", "MSE", "RMSE", "MAPE", "WAPE"],
+    "save_predictions": true
+  },
+  "efficiency": {
+    "warmup_iterations": 10,
+    "timed_iterations": 50,
+    "benchmark_batch_size": 1
+  }
+}
+

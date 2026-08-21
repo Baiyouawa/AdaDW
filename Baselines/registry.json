@@ -1,0 +1,82 @@
+{
+  "source_repository": "../DropoutTS",
+  "source_commit": "64a096e",
+  "models": {
+    "Crossformer": {
+      "year": 2023,
+      "status": "available",
+      "module": "basicts.models.Crossformer",
+      "model_class": "Crossformer",
+      "config_class": "CrossformerConfig",
+      "depth_parameter": "num_layers",
+      "width_parameter": "intermediate_size",
+      "raw_depth": 2,
+      "raw_width": 2048,
+      "width_unit": 256
+    },
+    "PatchTST": {
+      "year": 2023,
+      "status": "available",
+      "module": "basicts.models.PatchTST",
+      "model_class": "PatchTSTForForecasting",
+      "config_class": "PatchTSTConfig",
+      "depth_parameter": "num_layers",
+      "width_parameter": "intermediate_size",
+      "raw_depth": 1,
+      "raw_width": 1024,
+      "width_unit": 128
+    },
+    "TimesNet": {
+      "year": 2023,
+      "status": "available",
+      "module": "basicts.models.TimesNet",
+      "model_class": "TimesNetForForecasting",
+      "config_class": "TimesNetConfig",
+      "depth_parameter": "num_layers",
+      "width_parameter": "intermediate_size",
+      "raw_depth": 1,
+      "raw_width": 1024,
+      "width_unit": 128
+    },
+    "iTransformer": {
+      "year": 2024,
+      "status": "available",
+      "module": "basicts.models.iTransformer",
+      "model_class": "iTransformerForForecasting",
+      "config_class": "iTransformerConfig",
+      "depth_parameter": "num_layers",
+      "width_parameter": "intermediate_size",
+      "raw_depth": 1,
+      "raw_width": 1024,
+      "width_unit": 128
+    },
+    "TimeMixer": {
+      "year": 2024,
+      "status": "available",
+      "module": "basicts.models.TimeMixer",
+      "model_class": "TimeMixerForForecasting",
+      "config_class": "TimeMixerConfig",
+      "depth_parameter": "num_layers",
+      "width_parameter": "intermediate_size",
+      "raw_depth": 1,
+      "raw_width": 1024,
+      "width_unit": 128
+    },
+    "WPMMixer": {
+      "year": 2025,
+      "status": "missing",
+      "reason": "No implementation in DropoutTS"
+    },
+    "TimeFilter": {
+      "year": 2025,
+      "status": "missing",
+      "reason": "No implementation in DropoutTS"
+    },
+    "MultiPatchFormer": {
+      "year": 2025,
+      "status": "missing",
+      "reason": "No implementation in DropoutTS"
+    }
+  }
+}
+

@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# Large or generated experiment artifacts
+datasets/raw/**/*
+!datasets/raw/**/
+!datasets/raw/**/.gitkeep
+datasets/processed/**/*
+!datasets/processed/.gitkeep
+checkpoints/
+pre_experiments/results/**
+!pre_experiments/results/**/
+!pre_experiments/results/**/.gitkeep

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adawd-preexperiments"
+version = "0.1.0"
+description = "Reproducible pre-experiments for AdaWD-TS"
+requires-python = ">=3.9"
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "scipy>=1.10",
+  "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+training = [
+  "torch>=2.0",
+  "easy-torch==1.3.3",
+  "easydict",
+  "einops",
+  "packaging",
+  "setproctitle",
+  "tensorboard",
+  "tqdm",
+]
+test = ["pytest>=7"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
