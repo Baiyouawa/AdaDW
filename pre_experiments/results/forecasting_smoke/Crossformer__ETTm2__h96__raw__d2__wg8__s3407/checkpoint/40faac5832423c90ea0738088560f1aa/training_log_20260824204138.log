@@ -1,9 +1,0 @@
-2026-08-24 20:41:38,518 - BasicTS-training - INFO - Initializing training.
-2026-08-24 20:41:38,518 - BasicTS-training - INFO - Building train data loader.
-2026-08-24 20:41:38,523 - BasicTS-training - INFO - Set optim: Adam
-2026-08-24 20:41:38,523 - BasicTS-training - INFO - Building val data loader.
-2026-08-24 20:41:38,524 - BasicTS-training - INFO - Building test data loader.
-2026-08-24 20:41:38,526 - BasicTS-training - INFO - Total parameters: 46936624
-2026-08-24 20:41:38,526 - BasicTS-training - INFO - Trainable parameters: 46936624
-2026-08-24 20:41:38,527 - BasicTS-training - INFO - Use early stopping with patience 10.
-2026-08-24 20:41:38,527 - BasicTS-training - INFO - Epoch 1 / 1
