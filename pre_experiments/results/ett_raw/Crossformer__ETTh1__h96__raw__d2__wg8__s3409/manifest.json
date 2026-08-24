@@ -1,0 +1,42 @@
+{
+  "axis": "raw",
+  "model": "Crossformer",
+  "dataset": "ETTh1",
+  "input_length": 96,
+  "output_length": 96,
+  "depth": 2,
+  "width_group": 8,
+  "width": 2048,
+  "seed": 3409,
+  "run_id": "Crossformer__ETTh1__h96__raw__d2__wg8__s3409",
+  "status": "complete",
+  "checkpoint_dir": null,
+  "epochs": 100,
+  "batch_size": 64,
+  "metric_scale": "normalized",
+  "artifact_policy": "metrics",
+  "artifacts_removed": true,
+  "metrics": {
+    "overall": {
+      "MAE": 0.4442981320097229,
+      "MSE": 0.43966823220956497,
+      "RMSE": 0.6630748320613974
+    }
+  },
+  "efficiency": {
+    "total_parameters": 46936624,
+    "trainable_parameters": 46936624,
+    "flops_per_batch": null,
+    "flops_error": null,
+    "benchmark_batch_size": 1,
+    "latency_median_ms": 12.702690437436104,
+    "latency_p90_ms": 12.767592445015907,
+    "throughput_samples_per_second": 78.7234802678415,
+    "benchmark_peak_cuda_bytes": 208212480,
+    "device": "cuda:0",
+    "warmup_iterations": 10,
+    "timed_iterations": 50,
+    "training_wall_seconds": 601.414051069878,
+    "training_peak_cuda_bytes": 2067805696
+  }
+}

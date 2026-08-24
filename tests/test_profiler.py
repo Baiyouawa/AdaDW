@@ -1,6 +1,11 @@
 import numpy as np
 
-from adawd_preexp.profiler import ProfilerConfig, profile_segments, profile_window
+from adawd_preexp.profiler import (
+    ProfilerConfig,
+    profile_segments,
+    profile_window,
+    summarize_profiles,
+)
 
 
 def test_scores_are_bounded_and_change_raises_u():
@@ -55,3 +60,18 @@ def test_channel_subsampling_preserves_original_ids():
     records = profile_window(values, config, channels=[1, 3])
     assert [record["channel"] for record in records] == [1, 3]
     assert all(record["channel_effective_rank"] >= 1.0 for record in records)
+
+
+def test_summary_separates_temporal_and_channel_variation():
+    config = ProfilerConfig(window_size=32, stride=32, max_windows_per_segment=None)
+    first = np.column_stack([np.ones(32), np.full(32, 2.0)])
+    changed = np.column_stack(
+        [np.r_[np.ones(16), np.full(16, 4.0)], np.full(32, 2.0)]
+    )
+    frame = profile_segments("demo", [("raw", np.vstack([first, changed]))], config)
+
+    summary = summarize_profiles(frame, config)
+
+    assert set(summary["temporal_scores"]) == {"U", "M"}
+    assert summary["temporal_scores"]["U"]["window_p90"] > summary["temporal_scores"]["U"]["window_p10"]
+    assert 0.0 <= summary["temporal_scores"]["U"]["between_window_variance_share"] <= 1.0

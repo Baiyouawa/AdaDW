@@ -1,0 +1,18 @@
+{
+  "axis": "raw",
+  "model": "Crossformer",
+  "dataset": "ETTm2",
+  "input_length": 96,
+  "output_length": 96,
+  "depth": 2,
+  "width_group": 8,
+  "width": 2048,
+  "seed": 3407,
+  "run_id": "Crossformer__ETTm2__h96__raw__d2__wg8__s3407",
+  "status": "running",
+  "checkpoint_dir": "pre_experiments/results/forecasting_smoke/Crossformer__ETTm2__h96__raw__d2__wg8__s3407/checkpoint/40faac5832423c90ea0738088560f1aa",
+  "epochs": 1,
+  "batch_size": 32,
+  "metric_scale": "normalized",
+  "artifact_policy": "metrics"
+}

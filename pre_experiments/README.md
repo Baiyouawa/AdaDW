@@ -12,10 +12,12 @@ M_i = mean(m_peak, m_band)                     # univariate
 ```
 
 `profile_dataset.py` writes `windows.csv` and `summary.json`. The required
-diagnostics are the U/M distributions, P10/P50/P90, a U-by-M scatter plot,
-within-dataset low/mid/high buckets, and the U/M Spearman correlation. A narrow
-IQR or nearly perfect U/M correlation is a failed descriptor diagnostic, not a
-positive result.
+diagnostics are fixed-scale U/M time-channel heatmaps, window-level temporal
+trajectories, temporal-quartile box plots, a time-colored U-by-M scatter plot,
+P10/P50/P90, within-dataset low/mid/high buckets, and the U/M Spearman
+correlation. A narrow window-level spread or nearly perfect U/M correlation is
+a failed descriptor diagnostic, not a positive result. Absolute U/M means are
+not probabilities and have no universal 0.5 threshold.
 
 Electricity and Traffic are extremely wide. Their catalog entries use a
 deterministic, evenly spaced 64-channel subset for the initial profiler pass.

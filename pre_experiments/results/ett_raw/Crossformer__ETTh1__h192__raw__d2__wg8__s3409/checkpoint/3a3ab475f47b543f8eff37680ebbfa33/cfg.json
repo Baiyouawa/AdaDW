@@ -1,0 +1,112 @@
+{
+    "model": {
+        "name": "Crossformer",
+        "module": "basicts.models.Crossformer.arch.crossformer_arch"
+    },
+    "model_config": {
+        "input_len": 96,
+        "output_len": 192,
+        "num_features": 7,
+        "num_layers": 2,
+        "hidden_size": 512,
+        "win_size": 2,
+        "factor": 10,
+        "patch_len": 16,
+        "n_heads": 8,
+        "intermediate_size": 2048,
+        "hidden_act": "gelu",
+        "dropout": 0.05,
+        "baseline": false
+    },
+    "dataset_name": "ETTh1",
+    "gpus": "0",
+    "num_epochs": 100,
+    "optimizer_params": {
+        "lr": 0.0002,
+        "weight_decay": 0.0005
+    },
+    "metrics": [
+        "MAE",
+        "MSE",
+        "RMSE"
+    ],
+    "callbacks": [
+        {
+            "name": "EarlyStopping",
+            "module": "basicts.runners.callback.early_stopping",
+            "params": {}
+        }
+    ],
+    "seed": 3409,
+    "save_results": false,
+    "eval_after_train": true,
+    "rescale": false,
+    "deterministic": true,
+    "cudnn_benchmark": false,
+    "cudnn_determinstic": true,
+    "test_interval": 101,
+    "ckpt_save_dir": "pre_experiments/results/ett_raw/Crossformer__ETTh1__h192__raw__d2__wg8__s3409/checkpoint",
+    "train_data_num_workers": 4,
+    "val_data_num_workers": 4,
+    "test_data_num_workers": 4,
+    "taskflow": {
+        "name": "BasicTSForecastingTaskFlow",
+        "module": "basicts.runners.taskflow.forecasting_taskflow",
+        "params": {}
+    },
+    "gpu_num": 1,
+    "dataset_type": {
+        "name": "BasicTSForecastingDataset",
+        "module": "basicts.data.tsf_dataset"
+    },
+    "dataset_params": {
+        "dataset_name": "ETTh1",
+        "input_len": 96,
+        "output_len": 192,
+        "use_timestamps": false,
+        "data_file_path": "/root/AdaDW/datasets/processed/ETTh1",
+        "memmap": false
+    },
+    "null_val": NaN,
+    "null_to_num": 0.0,
+    "scaler": {
+        "name": "ZScoreScaler",
+        "module": "basicts.scaler.z_score_scaler"
+    },
+    "norm_each_channel": true,
+    "ddp_find_unused_parameters": false,
+    "compile_model": false,
+    "target_metric": "MAE",
+    "best_metric": "min",
+    "num_steps": null,
+    "loss": "MAE",
+    "optimizer": {
+        "name": "Adam",
+        "module": "torch.optim.adam"
+    },
+    "lr_scheduler": null,
+    "lr_scheduler_params": null,
+    "ckpt_save_strategy": null,
+    "finetune_from": null,
+    "strict_load": true,
+    "train_batch_size": 64,
+    "train_data_prefetch": false,
+    "train_data_shuffle": true,
+    "train_data_collate_fn": null,
+    "train_data_pin_memory": false,
+    "val_batch_size": 64,
+    "val_interval": 1,
+    "val_data_prefetch": false,
+    "val_data_shuffle": false,
+    "val_data_collate_fn": null,
+    "val_data_pin_memory": false,
+    "tf32": false,
+    "cudnn_enabled": true,
+    "test_batch_size": 64,
+    "test_data_prefetch": false,
+    "test_data_shuffle": false,
+    "test_data_collate_fn": null,
+    "test_data_pin_memory": false,
+    "eval_horizons": null,
+    "data_file_path": "/root/AdaDW/datasets/processed/ETTh1"
+}

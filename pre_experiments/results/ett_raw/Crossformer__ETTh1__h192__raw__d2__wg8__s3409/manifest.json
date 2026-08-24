@@ -1,0 +1,18 @@
+{
+  "axis": "raw",
+  "model": "Crossformer",
+  "dataset": "ETTh1",
+  "input_length": 96,
+  "output_length": 192,
+  "depth": 2,
+  "width_group": 8,
+  "width": 2048,
+  "seed": 3409,
+  "run_id": "Crossformer__ETTh1__h192__raw__d2__wg8__s3409",
+  "status": "running",
+  "checkpoint_dir": "pre_experiments/results/ett_raw/Crossformer__ETTh1__h192__raw__d2__wg8__s3409/checkpoint/3a3ab475f47b543f8eff37680ebbfa33",
+  "epochs": 100,
+  "batch_size": 64,
+  "metric_scale": "normalized",
+  "artifact_policy": "metrics"
+}

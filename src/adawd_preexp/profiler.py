@@ -307,6 +307,7 @@ def summarize_profiles(frame: pd.DataFrame, config: ProfilerConfig) -> Dict[str,
         "num_profiled_channels": int(frame["channel"].nunique()),
         "config": asdict(config),
         "scores": {},
+        "temporal_scores": {},
         "spearman_U_M": float(frame[["U", "M"]].corr(method="spearman").iloc[0, 1]),
     }
     for descriptor in descriptors:
@@ -318,5 +319,29 @@ def summarize_profiles(frame: pd.DataFrame, config: ProfilerConfig) -> Dict[str,
             "p50": float(values.quantile(0.5)),
             "p90": float(values.quantile(0.9)),
             "iqr": float(values.quantile(0.75) - values.quantile(0.25)),
+        }
+    window_keys = ["segment", "window_start"]
+    for score in ("U", "M"):
+        window_means = frame.groupby(window_keys, sort=False)[score].mean()
+        grand_mean = float(frame[score].mean())
+        expanded_window_means = frame.groupby(window_keys, sort=False)[score].transform("mean")
+        total_sum_squares = float(np.square(frame[score] - grand_mean).sum())
+        between_window_sum_squares = float(
+            np.square(expanded_window_means - grand_mean).sum()
+        )
+        summary["temporal_scores"][score] = {
+            "window_mean": float(window_means.mean()),
+            "window_std": float(window_means.std(ddof=0)),
+            "window_p10": float(window_means.quantile(0.1)),
+            "window_p50": float(window_means.quantile(0.5)),
+            "window_p90": float(window_means.quantile(0.9)),
+            "window_iqr": float(
+                window_means.quantile(0.75) - window_means.quantile(0.25)
+            ),
+            "between_window_variance_share": (
+                between_window_sum_squares / total_sum_squares
+                if total_sum_squares > 0.0
+                else 0.0
+            ),
         }
     return summary
