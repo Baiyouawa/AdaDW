@@ -9,6 +9,19 @@ from typing import Any, Dict, List, Tuple
 from .catalog import load_backbone_registry, load_preexperiment_config, resolve_dataset
 
 
+TIMEFILTER_PATCH_LENGTHS = {
+    "ETTh1": 2,
+    "ETTh2": 4,
+    "ETTm1": 8,
+    "ETTm2": 16,
+    "Weather": 48,
+    "Electricity": 32,
+    "ILI": 4,
+    "ExchangeRate": 4,
+    "Traffic": 96,
+}
+
+
 @dataclass(frozen=True)
 class SweepRun:
     axis: str
@@ -124,5 +137,6 @@ def build_model(run: SweepRun) -> Tuple[type, Any, bool]:
     use_timestamps = run.model == "TimesNet"
     if run.model == "TimesNet":
         kwargs.update(use_timestamps=True, timestamp_sizes=timestamp_sizes(run.dataset))
+    if run.model == "TimeFilter":
+        kwargs["patch_len"] = min(TIMEFILTER_PATCH_LENGTHS[run.dataset], run.input_length)
     return model_class, config_class(**kwargs), use_timestamps
-

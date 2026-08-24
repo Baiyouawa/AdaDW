@@ -101,10 +101,11 @@ def prepare_dataset(
         _validate_shape(canonical, values, entry, strict_shape)
         timestamp_values = _timestamp_features(index)
         train_end, val_end = _split_bounds(len(values), entry["split"])
+        context = int(entry["forecast_input_length"])
         slices = {
             "train": slice(0, train_end),
-            "val": slice(train_end, val_end),
-            "test": slice(val_end, len(values)),
+            "val": slice(train_end - context, val_end),
+            "test": slice(val_end - context, len(values)),
         }
         for split_name, split_slice in slices.items():
             np.save(output_dir / f"{split_name}_data.npy", values[split_slice].astype(np.float32))
@@ -120,6 +121,7 @@ def prepare_dataset(
             "shape": list(values.shape),
             "split": entry["split"],
             "split_lengths": {name: split_slice.stop - split_slice.start for name, split_slice in slices.items()},
+            "validation_test_context": context,
             "timestamp_features": ["time_of_day", "day_of_week", "day_of_month", "day_of_year"],
             "source_files": [str(raw_files[0])],
             "retains_full_series": True,

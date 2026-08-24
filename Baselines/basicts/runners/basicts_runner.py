@@ -475,7 +475,7 @@ class BasicTSRunner:
                     if step_pbar is not None:
                         step_pbar.update()
                     # check if training should stop
-                    if self.global_steps >= self.num_steps:
+                    if self.global_steps > self.num_steps:
                         self.should_training_stop = True
 
             # when training unit is epoch, call on epoch end
@@ -1003,13 +1003,9 @@ class BasicTSRunner:
         ckpt_path = self._get_ckpt_path(eqv_epoch)
         save_ckpt(ckpt_dict, ckpt_path, self.logger)
 
-        # clear ckpt every 10 epoch or in the end
-        if self.training_unit == "epoch":
-            if eqv_epoch % 10 == 0 or unit_count == self.num_epochs:
-                clear_ckpt(self.ckpt_save_dir)
-        else: # self.training_unit == "step"
-            if eqv_epoch % 10 == 0 or unit_count == self.num_steps:
-                clear_ckpt(self.ckpt_save_dir)
+        # The previous checkpoint is renamed to .bak before this save. Once the
+        # new checkpoint is durable, remove the backup immediately to cap disk use.
+        clear_ckpt(self.ckpt_save_dir)
 
     @master_only
     def _save_best_model(self, unit_count: int, metric_name: str, greater_best: bool = True):
@@ -1082,6 +1078,7 @@ class BasicTSRunner:
         # Create valid .npy memmaps so downstream local-loss analysis can use
         # np.load(..., mmap_mode="r") without separately tracking raw shapes.
         if batch_idx == 0:
+            self._results_write_offset = 0
             self._inputs_memmap = np.lib.format.open_memmap(
                 inputs_path, dtype=inputs.dtype, mode="w+",
                 shape=(total_samples, *inputs.shape[1:]))
@@ -1092,12 +1089,17 @@ class BasicTSRunner:
                 targets_path, dtype=targets.dtype, mode="w+",
                 shape=(total_samples, *targets.shape[1:]))
 
-        start = batch_idx * inputs.shape[0]
+        start = self._results_write_offset
         end = start + inputs.shape[0]
+        if end > total_samples:
+            raise RuntimeError(
+                f"Result batch exceeds allocated storage: end={end}, total={total_samples}"
+            )
 
         self._inputs_memmap[start:end] = inputs
         self._prediction_memmap[start:end] = prediction
         self._targets_memmap[start:end] = targets
+        self._results_write_offset = end
         if end >= total_samples:
             self._inputs_memmap.flush()
             self._prediction_memmap.flush()

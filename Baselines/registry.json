@@ -62,21 +62,50 @@
       "raw_width": 1024,
       "width_unit": 128
     },
-    "WPMMixer": {
+    "WPMixer": {
       "year": 2025,
-      "status": "missing",
-      "reason": "No implementation in DropoutTS"
+      "status": "available",
+      "module": "basicts.models.WPMMixer",
+      "model_class": "WPMixerForForecasting",
+      "config_class": "WPMixerConfig",
+      "depth_parameter": "num_layers",
+      "width_parameter": "intermediate_size",
+      "raw_depth": 2,
+      "raw_width": 1024,
+      "width_unit": 128,
+      "source_repository": "Secure-and-Intelligent-Systems-Lab/WPMixer",
+      "source_commit": "74104c9dddd54d279eb8323f48934b4fd75fcae7",
+      "paper": "https://arxiv.org/abs/2412.17176"
     },
     "TimeFilter": {
       "year": 2025,
-      "status": "missing",
-      "reason": "No implementation in DropoutTS"
+      "status": "available",
+      "module": "basicts.models.TimeFilter",
+      "model_class": "TimeFilterForForecasting",
+      "config_class": "TimeFilterConfig",
+      "depth_parameter": "num_layers",
+      "width_parameter": "intermediate_size",
+      "raw_depth": 2,
+      "raw_width": 256,
+      "width_unit": 64,
+      "source_repository": "TROUBADOUR000/TimeFilter",
+      "source_commit": "dffde87e4fff0fdeeebbacde03dc1e432e15b3a1",
+      "paper": "https://arxiv.org/abs/2501.13041"
     },
     "MultiPatchFormer": {
       "year": 2025,
-      "status": "missing",
-      "reason": "No implementation in DropoutTS"
+      "status": "available",
+      "module": "basicts.models.MultiPatchFormer",
+      "model_class": "MultiPatchFormerForForecasting",
+      "config_class": "MultiPatchFormerConfig",
+      "depth_parameter": "num_layers",
+      "width_parameter": "intermediate_size",
+      "raw_depth": 1,
+      "raw_width": 512,
+      "width_unit": 64,
+      "source_repository": "bioinfoUQAM/MultiPatchFormer",
+      "source_commit": "965e6bd60822d509183253ef9c51fc3f9efe23f3",
+      "paper": "https://www.nature.com/articles/s41598-024-82417-4"
     }
   }
 }
-

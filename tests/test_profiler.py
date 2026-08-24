@@ -32,6 +32,15 @@ def test_multifrequency_signal_raises_m():
     assert multiple_record["M"] > single_record["M"]
 
 
+def test_constant_signal_has_no_update_or_pattern_demand():
+    config = ProfilerConfig(window_size=96, max_windows_per_segment=None)
+
+    record = profile_window(np.ones((96, 1)), config)[0]
+
+    assert record["U"] == 0.0
+    assert record["M"] == 0.0
+
+
 def test_windows_do_not_cross_segments():
     config = ProfilerConfig(window_size=32, stride=16, max_windows_per_segment=None)
     segments = [("first", np.ones((64, 2))), ("second", np.ones((48, 2)))]

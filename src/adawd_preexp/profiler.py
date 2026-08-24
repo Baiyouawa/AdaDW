@@ -75,7 +75,7 @@ def _normalized_spectrum(values: np.ndarray, epsilon: float) -> np.ndarray:
     power = power[1:] if len(power) > 1 else power
     total = power.sum()
     if total <= epsilon:
-        return np.full(max(len(power), 1), 1.0 / max(len(power), 1))
+        return np.zeros(max(len(power), 1), dtype=np.float64)
     return power / total
 
 

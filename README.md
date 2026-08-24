@@ -13,9 +13,9 @@
 
 当前注册 9 个预测数据集：ETTh1、ETTh2、ETTm1、ETTm2、Weather、Electricity、ILI、ExchangeRate 和 Traffic。
 
-当前可运行 5 个 Backbone：Crossformer、PatchTST、TimesNet、iTransformer 和 TimeMixer。
+当前可运行 8 个 Backbone：Crossformer、PatchTST、TimesNet、iTransformer、TimeMixer、WPMixer、TimeFilter 和 MultiPatchFormer。
 
-WPMMixer、TimeFilter 和 MultiPatchFormer 在 DropoutTS 中没有实现，目前只有缺失占位，不能启动实验。
+前三个 2025 模型已从论文作者公开的官方仓库接入；具体来源、commit 和适配说明见 `Baselines/README.md`。
 
 > **Electricity 数据身份待确认**：当前代码按 DropoutTS 使用的 321 通道 LTSF Electricity
 > 基准配置。论文草稿中的“家庭电参量及分表计量”对应另一套数据。正式下载和报告实验前必须选择其中一套，不能混用名称。
@@ -27,7 +27,7 @@ AdaWD/
 ├── pixi.toml                        # Pixi 环境与一键任务
 ├── pixi.lock                        # 锁定的跨机器依赖版本
 ├── Baselines/                       # BasicTS 运行核心和 Backbone
-│   ├── basicts/models/              # 5 个现有模型和 3 个缺失占位
+│   ├── basicts/models/              # 8 个预测 Backbone
 │   └── registry.json                # 模型深度、宽度及 RAW 配置
 ├── datasets/
 │   ├── catalog.json                 # 数据集名称、维度、频率和切分配置
@@ -74,6 +74,50 @@ pixi run preexp-depth
 
 # 宽度预实验：默认 ETTh1 + PatchTST + horizon 96 + seed 42
 pixi run preexp-width
+```
+
+完整 RAW 时序预测基准使用 8 个模型、9 个数据集、每个数据集注册的 4 个
+horizon，以及随机种子 3407/3408/3409：
+
+```bash
+# 仅生成并检查 864-run 计划，不训练
+pixi run forecast-all-plan
+
+# 一键顺序执行，自动跳过协议一致且已经完成的 run
+pixi run forecast-all
+```
+
+正式全量运行前，先执行 72-run 的模型/数据集兼容性检查：
+
+```bash
+pixi run forecast-smoke-plan
+pixi run forecast-smoke
+```
+
+Smoke 模式为每个模型/数据集选择最短 horizon、seed 3407 和 1 epoch；它只覆盖
+训练、验证、预测、指标落盘和 checkpoint 清理链路，不用于比较模型精度。正式任务
+仍使用 `benchmark_config.json` 中的标准 epoch。
+
+模型训练轮数和 batch size 位于 `pre_experiments/benchmark_config.json`，按各模型
+官方训练代码设置；Electricity 和 Traffic 另有显存安全上限。正式指标为逐通道
+ZScore 空间的 MAE/MSE/RMSE，每组三个 seed 输出 mean 和 sample std。成功 run 仅保留
+manifest 中的指标与效率记录，测试完成后删除 checkpoint 和预测数组。
+
+长任务可按计划编号分段运行：
+
+```bash
+pixi run python pre_experiments/run_forecasting_benchmarks.py \
+  --start-index 1 --stop-index 108
+```
+
+计划和最终结果位于：
+
+```text
+pre_experiments/results/forecasting_raw/plan.csv
+pre_experiments/results/forecasting_raw/summary/per_seed.csv
+pre_experiments/results/forecasting_raw/summary/summary.csv
+pre_experiments/results/forecasting_raw/summary/coverage.csv
+pre_experiments/results/forecasting_raw/summary/Result.md
 ```
 
 正式训练前可只查看容量计划：
@@ -403,14 +447,14 @@ pixi run preexp-depth \
   --seeds 42
 ```
 
-### 7.5 扩展到 5 个现有 Backbone
+### 7.5 扩展到 8 个 Backbone
 
 在最小闭环完全通过后，再运行：
 
 ```bash
 set -euo pipefail
 
-for model in Crossformer PatchTST TimesNet iTransformer TimeMixer; do
+for model in Crossformer PatchTST TimesNet iTransformer TimeMixer WPMixer TimeFilter MultiPatchFormer; do
   for axis in raw depth width joint; do
     pixi run python pre_experiments/run_capacity_sweep.py \
       --dataset ETTh1 \
@@ -424,7 +468,7 @@ for model in Crossformer PatchTST TimesNet iTransformer TimeMixer; do
 done
 ```
 
-确认 5 个模型均能完成后，才逐步扩展数据集、预测长度和三个随机种子。不要直接执行 9 数据集、5 模型、4 预测长度、4 种实验轴的全量笛卡尔积，它会产生数千次训练。
+确认 8 个模型均能完成后，才逐步扩展数据集、预测长度和三个随机种子。不要直接执行 9 数据集、8 模型、4 预测长度、4 种实验轴的全量笛卡尔积，它会产生数千次训练。
 
 ## 8. 每次训练保存什么
 
@@ -510,10 +554,10 @@ pre_experiments/results/saturation/
 4. 检查 U/M 指标是否退化；
 5. 运行深度和宽度任务的 plan；
 6. 完成 `ETTh1 + PatchTST + 96 + seed 42` 的完整闭环；
-7. 扩展到 5 个现有 Backbone；
+7. 扩展到 8 个 Backbone；
 8. 扩展到其他数据集和预测长度；
 9. 增加种子 43、44；
 10. 生成局部损失、饱和容量和 Q1-Q4 统计；
-11. 最后再决定是否引入缺失的 3 个 2025 Backbone。
+11. 在全数据集扩展前，分别复核 3 个 2025 Backbone 的论文协议与官方超参数。
 
 更详细的统计定义和公平性约束见 [`pre_experiments/README.md`](pre_experiments/README.md)。

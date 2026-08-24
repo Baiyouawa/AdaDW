@@ -11,11 +11,35 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATASET_CATALOG_PATH = PROJECT_ROOT / "datasets" / "catalog.json"
 BACKBONE_REGISTRY_PATH = PROJECT_ROOT / "Baselines" / "registry.json"
 PREEXPERIMENT_CONFIG_PATH = PROJECT_ROOT / "pre_experiments" / "config.json"
+GIT_LFS_POINTER_HEADER = "version https://git-lfs.github.com/spec/v1"
+
+
+def is_git_lfs_pointer(path: Path) -> bool:
+    """Return whether a file is an unresolved Git LFS pointer."""
+
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            return handle.readline().strip() == GIT_LFS_POINTER_HEADER
+    except (OSError, UnicodeError):
+        return False
 
 
 def load_json(path: Path) -> Dict[str, Any]:
+    if is_git_lfs_pointer(path):
+        raise RuntimeError(
+            f"{path} is an unresolved Git LFS pointer. Run 'git lfs pull' or restore "
+            "the repository metadata before running the experiment."
+        )
     with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+        try:
+            value = json.load(handle)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"Invalid JSON in {path} at line {exc.lineno}, column {exc.colno}: {exc.msg}"
+            ) from exc
+    if not isinstance(value, dict):
+        raise ValueError(f"Expected a JSON object in {path}, got {type(value).__name__}")
+    return value
 
 
 def load_dataset_catalog() -> Dict[str, Dict[str, Any]]:
@@ -48,7 +72,11 @@ def find_raw_files(dataset_name: str) -> Tuple[Path, ...]:
     candidate_names = [canonical] + list(entry.get("aliases", []))
     candidate_dirs = [PROJECT_ROOT / "datasets" / "raw" / name for name in candidate_names]
     for raw_dir in candidate_dirs:
-        found = tuple(raw_dir / name for name in entry["raw_files"] if (raw_dir / name).is_file())
+        found = tuple(
+            raw_dir / name
+            for name in entry["raw_files"]
+            if (raw_dir / name).is_file() and not is_git_lfs_pointer(raw_dir / name)
+        )
         if entry["task"] == "classification":
             expected = tuple(raw_dir / name for name in entry["raw_files"])
             if all(path.is_file() for path in expected):

@@ -14,11 +14,22 @@ from pathlib import Path
 from typing import Iterable, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 RAW_ROOT = PROJECT_ROOT / "datasets" / "raw"
+GIT_LFS_POINTER_HEADER = "version https://git-lfs.github.com/spec/v1"
+
+
+class _PermanentRedirectHandler(HTTPRedirectHandler):
+    """Teach urllib to follow HTTP 308 responses returned by dataset mirrors."""
+
+    def http_error_308(self, request, response, code, msg, headers):
+        return self.http_error_302(request, response, code, msg, headers)
+
+
+URL_OPENER = build_opener(_PermanentRedirectHandler())
 
 # THUML maintains the benchmark bundle used by Time-Series-Library. The mirror
 # has the same repository layout and is useful where Hugging Face is blocked.
@@ -107,6 +118,8 @@ def validate_csv(path: Path, spec: DatasetSpec) -> None:
             header = next(reader, None)
             if not header:
                 raise ValidationError("file is empty")
+            if header == [GIT_LFS_POINTER_HEADER]:
+                raise ValidationError("file is an unresolved Git LFS pointer")
             if "date" not in header:
                 raise ValidationError("missing required 'date' column")
             expected_columns = spec.channels + 1
@@ -164,7 +177,7 @@ def download_once(url: str, part_path: Path, timeout: float, name: str) -> None:
 
     request = Request(url, headers=headers)
     try:
-        response = urlopen(request, timeout=timeout)
+        response = URL_OPENER.open(request, timeout=timeout)
     except HTTPError as exc:
         # A previous run can leave a complete .part file. Some servers answer a
         # range request at EOF with 416; validation below decides if it is usable.
@@ -173,12 +186,17 @@ def download_once(url: str, part_path: Path, timeout: float, name: str) -> None:
         raise
 
     with response:
-        status = getattr(response, "status", response.getcode())
+        status = getattr(response, "status", None)
+        if status is None:
+            status = response.getcode()
         resumed = bool(existing and status == 206)
         mode = "ab" if resumed else "wb"
         downloaded = existing if resumed else 0
         content_length = response.headers.get("Content-Length")
         total = downloaded + int(content_length) if content_length else None
+        content_range = response.headers.get("Content-Range")
+        if resumed and content_range and "/" in content_range:
+            total = int(content_range.rsplit("/", 1)[1])
         last_report = time.monotonic()
 
         with part_path.open(mode) as handle:
@@ -194,6 +212,10 @@ def download_once(url: str, part_path: Path, timeout: float, name: str) -> None:
                     last_report = now
             handle.flush()
             os.fsync(handle.fileno())
+        if total is not None and downloaded != total:
+            raise OSError(
+                f"incomplete response: received {downloaded} of {total} bytes"
+            )
         report_progress(name, downloaded, total, final=True)
 
 
@@ -239,15 +261,17 @@ def download_dataset(
                 print(f"[{name}] Saved: {destination.relative_to(PROJECT_ROOT)}")
                 return "downloaded"
             except ValidationError as exc:
-                failures.append(f"{url}: validation failed: {exc}")
+                failures.append(
+                    f"{url} (attempt {attempt}/{retries}): validation failed: {exc}"
+                )
                 part_path.unlink(missing_ok=True)
-                break
+                if attempt < retries:
+                    print(f"  retry {attempt + 1}/{retries}: validation failed: {exc}")
+                    time.sleep(min(attempt * 2, 5))
             except (HTTPError, URLError, TimeoutError, OSError) as exc:
                 reason = getattr(exc, "reason", exc)
                 failures.append(f"{url} (attempt {attempt}/{retries}): {reason}")
-                host_unreachable = isinstance(exc, (URLError, TimeoutError)) and not isinstance(
-                    exc, HTTPError
-                )
+                host_unreachable = isinstance(exc, URLError) and not isinstance(exc, HTTPError)
                 if attempt < retries:
                     print(f"  retry {attempt + 1}/{retries}: {reason}")
                     time.sleep(min(attempt * 2, 5))

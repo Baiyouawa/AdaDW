@@ -67,8 +67,11 @@ def _local_profiles(
     return pd.DataFrame(rows)
 
 
-def _load_results(run_dir: Path) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    result_dir = run_dir / "checkpoint" / "test_results"
+def _load_results(
+    run_dir: Path, manifest: Dict[str, object]
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    checkpoint_dir = Path(str(manifest.get("checkpoint_dir", run_dir / "checkpoint")))
+    result_dir = checkpoint_dir / "test_results"
     paths = [result_dir / name for name in ("inputs.npy", "prediction.npy", "targets.npy")]
     missing = [str(path) for path in paths if not path.is_file()]
     if missing:
@@ -88,13 +91,13 @@ def main() -> None:
 
     cached_profiles: Dict[Tuple[str, int, int, int | None], pd.DataFrame] = {}
     all_rows = []
-    manifests = sorted(args.runs_root.glob("*/manifest.json"))
+    manifests = sorted(args.runs_root.rglob("manifest.json"))
     for manifest_path in manifests:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if manifest.get("status") != "complete":
             continue
         run_dir = manifest_path.parent
-        inputs, predictions, targets = _load_results(run_dir)
+        inputs, predictions, targets = _load_results(run_dir, manifest)
         if predictions.shape != targets.shape:
             raise ValueError(f"Prediction/target shape mismatch in {run_dir.name}")
         key = (manifest["dataset"], inputs.shape[1], args.sample_stride, args.max_samples)
@@ -126,4 +129,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

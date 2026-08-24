@@ -1,0 +1,51 @@
+{
+  "seeds": [3407, 3408, 3409],
+  "metric_scale": "normalized",
+  "artifact_policy": "metrics",
+  "models": {
+    "Crossformer": {
+      "epochs": 20,
+      "batch_size": 32,
+      "source": "Official Crossformer training default"
+    },
+    "PatchTST": {
+      "epochs": 100,
+      "batch_size": 64,
+      "source": "Official PatchTST supervised forecasting schedule"
+    },
+    "TimesNet": {
+      "epochs": 10,
+      "batch_size": 32,
+      "source": "Official Time-Series-Library TimesNet scripts"
+    },
+    "iTransformer": {
+      "epochs": 10,
+      "batch_size": 32,
+      "source": "Official iTransformer long-term forecasting scripts"
+    },
+    "TimeMixer": {
+      "epochs": 10,
+      "batch_size": 32,
+      "source": "Official TimeMixer long-term forecasting scripts"
+    },
+    "WPMixer": {
+      "epochs": 10,
+      "batch_size": 64,
+      "source": "Official WPMixer default and unified ETT scripts"
+    },
+    "TimeFilter": {
+      "epochs": 10,
+      "batch_size": 32,
+      "source": "Official TimeFilter default and ETT scripts"
+    },
+    "MultiPatchFormer": {
+      "epochs": 20,
+      "batch_size": 32,
+      "source": "Official MultiPatchFormer runner default"
+    }
+  },
+  "dataset_batch_caps": {
+    "Electricity": 16,
+    "Traffic": 8
+  }
+}

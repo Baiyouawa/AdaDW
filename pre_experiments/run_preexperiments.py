@@ -39,6 +39,8 @@ def capacity_command(
     seeds: Sequence[int],
     gpu: str | None,
     dry_run: bool,
+    epochs: int | None = None,
+    batch_size: int | None = None,
 ) -> list[str]:
     command = [
         sys.executable,
@@ -57,6 +59,10 @@ def capacity_command(
     if dry_run:
         command.append("--dry-run")
     else:
+        if epochs is not None:
+            command.extend(["--epochs", str(epochs)])
+        if batch_size is not None:
+            command.extend(["--batch-size", str(batch_size)])
         if gpu is not None:
             command.extend(["--gpu", gpu])
         command.append("--all")
@@ -125,6 +131,8 @@ def run_capacity_stage(args: argparse.Namespace) -> None:
             seeds=args.seeds,
             gpu=None if args.cpu else args.gpu,
             dry_run=args.dry_run,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
         )
     )
 
@@ -170,6 +178,8 @@ def build_parser() -> argparse.ArgumentParser:
         capacity_parser.add_argument("--cpu", action="store_true")
         capacity_parser.add_argument("--dry-run", action="store_true")
         capacity_parser.add_argument("--skip-prepare", action="store_true")
+        capacity_parser.add_argument("--epochs", type=int)
+        capacity_parser.add_argument("--batch-size", type=int)
 
     return parser
 

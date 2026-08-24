@@ -59,6 +59,20 @@ wall time, inference latency (median and P90), throughput, and CUDA peak memory
 where available. FLOPs may be null when an operator is unsupported; that is
 reported rather than replaced by a parameter-count proxy.
 
+## 4. Full forecasting benchmark
+
+`run_forecasting_benchmarks.py` builds the Cartesian product of all eight
+registered Backbones, all nine forecasting datasets, each dataset's four
+catalog horizons, and seeds 3407/3408/3409. Model-specific epoch and batch
+settings are recorded in `benchmark_config.json`. The runner is resumable and
+supports `--start-index`/`--stop-index` for scheduling subsets of `plan.csv`.
+
+The benchmark uses normalized MAE/MSE/RMSE and `artifact_policy=metrics`.
+Checkpoints exist only while fitting and evaluating the best epoch, then are
+deleted after their metrics are copied into the run manifest. The summary tool
+produces per-seed values, mean/sample-standard-deviation tables, coverage, and
+a Markdown report.
+
 The current environment has no raw data and no PyTorch installation, so only
 planning and data-analysis code can run here. `--dry-run` validates experiment
 coverage without launching training.
@@ -69,5 +83,6 @@ coverage without launching training.
   capacity candidates of one Backbone/dataset pair.
 - Report actual compute; depth 4 in Crossformer is not compute-equivalent to
   depth 4 in PatchTST.
-- Three missing 2025 Backbones remain disabled until verified implementations
-  and architecture-specific depth/width adapters are added.
+- The three 2025 Backbones use architecture-specific BasicTS adapters. Their
+  source repositories, reviewed commits and adaptation notes are recorded in
+  `Baselines/README.md`.

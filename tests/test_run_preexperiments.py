@@ -44,9 +44,26 @@ def test_dry_run_does_not_prepare_dataset(monkeypatch):
         cpu=False,
         dry_run=True,
         skip_prepare=False,
+        epochs=None,
+        batch_size=None,
     )
 
     run_preexperiments.run_capacity_stage(args)
 
     assert len(commands) == 1
     assert "--dry-run" in commands[0]
+
+
+def test_capacity_command_passes_training_overrides():
+    command = capacity_command(
+        "depth", "ILI", "WPMixer", 24, [42], "0", False, epochs=2, batch_size=8
+    )
+
+    assert command[command.index("--epochs") : command.index("--epochs") + 2] == [
+        "--epochs",
+        "2",
+    ]
+    assert command[command.index("--batch-size") : command.index("--batch-size") + 2] == [
+        "--batch-size",
+        "8",
+    ]
