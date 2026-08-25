@@ -21,10 +21,22 @@
       "model_class": "PatchTSTForForecasting",
       "config_class": "PatchTSTConfig",
       "depth_parameter": "num_layers",
-      "width_parameter": "intermediate_size",
-      "raw_depth": 1,
-      "raw_width": 1024,
-      "width_unit": 128
+      "width_parameter": "hidden_size",
+      "coupled_width_parameter": "intermediate_size",
+      "coupled_width_ratio": 8,
+      "raw_depth": 3,
+      "raw_width": 16,
+      "depth_candidates": [1, 2, 3, 4, 5],
+      "width_group_candidates": [1, 2, 4, 8, 16],
+      "width_unit": 4,
+      "fixed_config": {
+        "n_heads": 4,
+        "attn_dropout": 0.3,
+        "fc_dropout": 0.3,
+        "head_dropout": 0.0,
+        "patch_len": 16,
+        "patch_stride": 8
+      }
     },
     "TimesNet": {
       "year": 2023,
@@ -57,10 +69,19 @@
       "model_class": "TimeMixerForForecasting",
       "config_class": "TimeMixerConfig",
       "depth_parameter": "num_layers",
-      "width_parameter": "intermediate_size",
-      "raw_depth": 1,
-      "raw_width": 1024,
-      "width_unit": 128
+      "width_parameter": "hidden_size",
+      "coupled_width_parameter": "intermediate_size",
+      "coupled_width_ratio": 2,
+      "raw_depth": 2,
+      "raw_width": 16,
+      "depth_candidates": [1, 2, 3, 4, 5],
+      "width_group_candidates": [1, 2, 4, 8, 16],
+      "width_unit": 4,
+      "fixed_config": {
+        "down_sampling_layers": 3,
+        "down_sampling_window": 2,
+        "down_sampling_method": "avg"
+      }
     },
     "WPMixer": {
       "year": 2025,
@@ -99,9 +120,13 @@
       "model_class": "MultiPatchFormerForForecasting",
       "config_class": "MultiPatchFormerConfig",
       "depth_parameter": "num_layers",
-      "width_parameter": "intermediate_size",
+      "width_parameter": "hidden_size",
+      "coupled_width_parameter": "intermediate_size",
+      "coupled_width_ratio": 1,
       "raw_depth": 1,
-      "raw_width": 512,
+      "raw_width": 256,
+      "depth_candidates": [1, 2, 3, 4, 5],
+      "width_group_candidates": [1, 2, 4, 8, 16],
       "width_unit": 64,
       "source_repository": "bioinfoUQAM/MultiPatchFormer",
       "source_commit": "965e6bd60822d509183253ef9c51fc3f9efe23f3",

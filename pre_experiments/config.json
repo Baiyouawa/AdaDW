@@ -19,6 +19,15 @@
     "saturation_tolerance": 0.01,
     "seeds": [3407, 3408, 3409]
   },
+  "model_trajectory": {
+    "dataset": "ETTh1",
+    "models": ["PatchTST", "TimeMixer", "MultiPatchFormer"],
+    "horizon": 96,
+    "metric": "loss_mse",
+    "sample_stride": 24,
+    "selection_tolerance": 0.0,
+    "seeds": [3407]
+  },
   "training": {
     "epochs": 100,
     "batch_size": 64,

@@ -36,6 +36,10 @@ preexp-depth-plan = { cmd = "python pre_experiments/run_preexperiments.py depth 
 preexp-depth = { cmd = "python pre_experiments/run_preexperiments.py depth", description = "Run the default pilot depth pre-experiment" }
 preexp-width-plan = { cmd = "python pre_experiments/run_preexperiments.py width --dry-run", description = "Print the default pilot width sweep without training" }
 preexp-width = { cmd = "python pre_experiments/run_preexperiments.py width", description = "Run the default pilot width pre-experiment" }
+model-preexp-plan = { cmd = "python pre_experiments/run_model_preexperiments.py --dry-run", description = "Print the 2023/2024/2025 ETTh1 model-capacity plan" }
+model-preexp = { cmd = "python pre_experiments/run_model_preexperiments.py --all --output-root pre_experiments/results/model_trajectories/runs", description = "Run the 2023/2024/2025 ETTh1 model-capacity experiment" }
+model-preexp-losses = { cmd = "python pre_experiments/build_local_losses.py --runs-root pre_experiments/results/model_trajectories/runs --sample-stride 24 --output pre_experiments/results/model_trajectories/local_losses.csv", description = "Build aligned ETTh1 per-window losses for the three model sweeps" }
+model-preexp-analyze = { cmd = "python pre_experiments/analyze_model_trajectories.py --losses pre_experiments/results/model_trajectories/local_losses.csv", description = "Select and plot temporal best-depth and best-width trajectories" }
 forecast-all-plan = { cmd = "python pre_experiments/run_forecasting_benchmarks.py --dry-run", description = "Write the 864-run eight-model forecasting plan" }
 forecast-all = { cmd = "python pre_experiments/run_forecasting_benchmarks.py", description = "Run all eight models on all nine datasets and aggregate three seeds" }
 forecast-smoke-plan = { cmd = "python pre_experiments/run_forecasting_benchmarks.py --smoke --dry-run --output-root pre_experiments/results/forecasting_smoke", description = "Write the 72-run one-epoch forecasting smoke plan" }

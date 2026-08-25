@@ -32,6 +32,7 @@ class SweepRun:
     depth: int
     width_group: int
     width: int
+    coupled_width: int | None
     seed: int
 
     @property
@@ -55,6 +56,27 @@ def _model_entry(model_name: str) -> Dict[str, Any]:
     if entry["status"] != "available":
         raise RuntimeError(f"{model_name} is unavailable: {entry['reason']}")
     return entry
+
+
+def capacity_candidates(model_name: str, axis: str) -> List[int]:
+    """Return the model-specific candidates for one capacity axis."""
+
+    entry = _model_entry(model_name)
+    experiment = load_preexperiment_config()["capacity"]
+    if axis == "depth":
+        values = entry.get("depth_candidates", experiment["depth_candidates"])
+    elif axis == "width":
+        values = entry.get(
+            "width_group_candidates", experiment["width_group_candidates"]
+        )
+    else:
+        raise ValueError("axis must be depth or width")
+    candidates = [int(value) for value in values]
+    if len(candidates) != len(set(candidates)) or any(value < 1 for value in candidates):
+        raise ValueError(
+            f"{model_name} has invalid {axis} candidates: {candidates}"
+        )
+    return candidates
 
 
 def plan_sweep(
@@ -83,9 +105,12 @@ def plan_sweep(
     if axis == "raw":
         pairs = [(entry["raw_depth"], raw_group)]
     elif axis == "depth":
-        pairs = [(depth, raw_group) for depth in experiment["depth_candidates"]]
+        pairs = [(depth, raw_group) for depth in capacity_candidates(model_name, "depth")]
     elif axis == "width":
-        pairs = [(entry["raw_depth"], group) for group in experiment["width_group_candidates"]]
+        pairs = [
+            (entry["raw_depth"], group)
+            for group in capacity_candidates(model_name, "width")
+        ]
     elif axis == "joint":
         pairs = [
             (depth, group)
@@ -105,6 +130,11 @@ def plan_sweep(
             depth=int(depth),
             width_group=int(group),
             width=int(group * entry["width_unit"]),
+            coupled_width=(
+                int(group * entry["width_unit"] * entry["coupled_width_ratio"])
+                if "coupled_width_parameter" in entry
+                else None
+            ),
             seed=int(seed),
         )
         for horizon in horizons
@@ -131,9 +161,12 @@ def build_model(run: SweepRun) -> Tuple[type, Any, bool]:
         "input_len": run.input_length,
         "output_len": run.output_length,
         "num_features": dataset["expected_channels"],
+        **entry.get("fixed_config", {}),
         entry["depth_parameter"]: run.depth,
         entry["width_parameter"]: run.width,
     }
+    if "coupled_width_parameter" in entry:
+        kwargs[entry["coupled_width_parameter"]] = run.coupled_width
     use_timestamps = run.model == "TimesNet"
     if run.model == "TimesNet":
         kwargs.update(use_timestamps=True, timestamp_sizes=timestamp_sizes(run.dataset))

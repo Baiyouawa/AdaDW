@@ -114,8 +114,16 @@ def main() -> None:
         error = predictions[sample_index, :, channel] - targets[sample_index, :, channel]
         profiles["loss_mae"] = np.mean(np.abs(error), axis=1)
         profiles["loss_mse"] = np.mean(error**2, axis=1)
-        for field in ("model", "seed", "axis", "depth", "width_group", "width"):
-            profiles[field] = manifest[field]
+        for field in (
+            "model",
+            "seed",
+            "axis",
+            "depth",
+            "width_group",
+            "width",
+            "coupled_width",
+        ):
+            profiles[field] = manifest.get(field)
         profiles["horizon"] = manifest["output_length"]
         profiles["run_id"] = manifest["run_id"]
         all_rows.append(profiles)
