@@ -46,4 +46,6 @@ datasets/raw/
 CSV forecasting files must have one timestamp column (`date` by default) and
 numeric signal columns. The generated `datasets/processed/<name>/` directory
 contains `train_data.npy`, `val_data.npy`, `test_data.npy`, matching timestamp
-arrays and `meta.json`. The BasicTS snapshot consumes this format directly.
+feature arrays, `train/val/test_time_index.npy` with the real `datetime64[ns]`
+axis, and `meta.json` with signal-column names. BasicTS consumes the data and
+timestamp-feature arrays; forecast visualization uses the real time-index arrays.

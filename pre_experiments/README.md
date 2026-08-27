@@ -62,9 +62,11 @@ local unit and requires all capacity candidates for that same unit.
 Capacity runs with `artifact_policy=full` store a manifest, configured metrics,
 predictions, targets, per-window MAE/MSE and efficiency records. Formal RAW runs
 use `artifact_policy=metrics`: they keep normalized MAE/MSE/RMSE and efficiency
-metadata, then remove checkpoints and prediction arrays. FLOPs may be null when
-an operator is unsupported; that is reported rather than replaced by a
-parameter-count proxy.
+metadata plus a compact original-scale forecast slice and PNG, then remove
+checkpoints and temporary selected-sample arrays. Formal evaluation selectively
+captures only the registered visualization window rather than writing full-test
+prediction arrays. FLOPs may be null when an operator is
+unsupported; that is reported rather than replaced by a parameter-count proxy.
 
 ## 4. Full forecasting benchmark
 
@@ -80,6 +82,15 @@ Checkpoints exist only while fitting and evaluating the best epoch, then are
 deleted after their metrics are copied into the run manifest. The summary tool
 produces per-seed values, mean/sample-standard-deviation tables, coverage, and
 a Markdown report.
+
+Each run visualizes the fixed 50% position in the test interval shared by all
+four horizons and at most four evenly spaced channel IDs. Thus all horizons of
+one dataset have the same forecast start; neither targets nor errors influence
+selection. The final summary
+builds one plot per dataset/horizon (36 for the full matrix), overlaying ground
+truth and all eight Backbones. Backbone curves are means across available seeds,
+with one-sample-standard-deviation bands. Plots use original data units and real
+timestamps, while accuracy metrics remain in normalized space.
 
 Every planned run carries a data fingerprint and protocol signature. Resume and
 summary operations require an exact signature match, so results from changed

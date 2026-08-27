@@ -110,7 +110,13 @@ Smoke 模式为每个模型/数据集选择最短 horizon、seed 3407 和 1 epoc
 `pre_experiments/benchmark_config.json`；Electricity 和 Traffic 另有显存安全上限。该配置是
 本项目预注册的统一比较协议，不等于逐项复刻所有官方脚本。正式指标为逐通道
 ZScore 空间的 MAE/MSE/RMSE，每组三个 seed 输出 mean 和 sample std。成功 run 仅保留
-manifest 中的指标与效率记录，测试完成后删除 checkpoint 和预测数组。
+manifest 中的指标与效率记录、一个原始量纲预测切片 CSV 和对应 PNG。评估过程只选择性
+捕获这个固定窗口，不保存完整测试集预测；生成图片后删除 checkpoint 和临时样本数组。
+
+预测图不按误差挑选窗口：在能容纳该数据集最大 horizon 的公共测试区间内固定取相对位置
+50% 的窗口，因此同一数据集四个 horizon 使用相同预测起点；再从通道 ID 中等距选取最多
+4 个通道。每个 run 会生成单模型真实值/预测值图；每次调度结束还会按数据集和 horizon
+生成 8 个 Baseline 的跨 seed 对比图。全量完成后共有 `9 x 4 = 36` 张汇总图。
 
 长任务可按计划编号分段运行：
 
@@ -265,6 +271,9 @@ datasets/processed/ETTh1/
 ├── train_timestamps.npy
 ├── val_timestamps.npy
 ├── test_timestamps.npy
+├── train_time_index.npy
+├── val_time_index.npy
+├── test_time_index.npy
 └── meta.json
 ```
 
@@ -507,6 +516,20 @@ pre_experiments/results/runs/<run_id>/
 - 总参数量和可训练参数量；
 - FLOPs，若当前算子不支持则记录失败原因；
 - 训练总时间、推理延迟中位数和 P90、吞吐量及 CUDA 峰值显存。
+
+正式 RAW run 的目录还会保留：
+
+```text
+forecast_slice.csv       # 固定测试窗口，原始量纲的历史/真实未来/预测
+forecast_vs_target.png   # 单模型、单 seed 的预测图
+```
+
+汇总目录另外生成：
+
+```text
+summary/visualization_index.csv
+summary/visualizations/<dataset>__h<horizon>__baseline_forecasts.png
+```
 
 ## 9. 生成逐局部单元损失
 

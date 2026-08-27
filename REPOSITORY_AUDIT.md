@@ -74,6 +74,8 @@ PatchTST、TimeMixer、MultiPatchFormer 的深宽预实验另有 `raw_depth/raw_
 7. processed metadata 保存原始数据 SHA256、切分边界和数据指纹；每个计划项保存完整协议
    签名。架构、训练参数、数据目录、关键训练代码或 seed 变化后，旧 manifest 不会被续跑器
    静默复用，汇总器也不会将其混入新计划。
+8. 预测图固定使用四个 horizon 公共测试区间的 50% 位置和等距通道 ID，同一数据集保持相同
+   预测起点，不根据测试误差或目标形态挑选“好看”窗口。
 
 需要区别两种测试集使用方式：正式 RAW benchmark 只做最终评估；现有 ETTh1 模型容量预实验
 使用测试目标构造逐窗口 oracle。后者是事后上界分析，不是可部署选择器，不能用来训练控制器
@@ -121,5 +123,10 @@ PatchTST、TimeMixer、MultiPatchFormer 的深宽预实验另有 `raw_depth/raw_
 - `pre_experiments/results/forecasting_raw/summary/Result.md`：正式 RAW benchmark 当前为
   `0/864`，没有精度结论。
 
-Git 只发布可复核的代码、配置、报告、图和统计表。checkpoint、预测数组、TensorBoard、
+正式实验完成后，每个 run 还会保留一个原始量纲 `forecast_slice.csv` 和单模型 PNG；汇总器
+将生成 36 张 `dataset x horizon` 的八模型对比图及 `visualization_index.csv`。完整预测数组
+不会落盘；test loader 流式评估时只选择性捕获预注册的一个窗口，生成紧凑产物后删除临时
+样本数组。
+
+Git 只发布可复核的代码、配置、报告、图和统计表。checkpoint、完整预测数组、TensorBoard、
 训练日志、缓存和 processed NPY 继续忽略，避免仓库膨胀及把临时运行状态误当正式结果。

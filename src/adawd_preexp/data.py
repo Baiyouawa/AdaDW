@@ -17,18 +17,21 @@ from .catalog import PROJECT_ROOT, find_raw_files, resolve_dataset
 Segment = Tuple[str, np.ndarray]
 
 
-def _read_forecasting_csv(path: Path, date_column: str) -> Tuple[np.ndarray, pd.DatetimeIndex]:
+def _read_forecasting_csv(
+    path: Path, date_column: str
+) -> Tuple[np.ndarray, pd.DatetimeIndex, List[str]]:
     frame = pd.read_csv(path)
     if date_column not in frame.columns:
         raise ValueError(f"{path} has no required timestamp column '{date_column}'")
     timestamps = pd.DatetimeIndex(pd.to_datetime(frame.pop(date_column), errors="raise"))
+    signal_columns = [str(column) for column in frame.columns]
     numeric = frame.apply(pd.to_numeric, errors="raise")
     values = numeric.to_numpy(dtype=np.float64)
     if values.ndim != 2 or values.shape[1] == 0:
         raise ValueError(f"{path} contains no signal columns")
     if not np.isfinite(values).all():
         raise ValueError(f"{path} contains NaN or infinite signal values")
-    return values, timestamps
+    return values, timestamps, signal_columns
 
 
 def _validate_time_axis(
@@ -138,7 +141,9 @@ def prepare_dataset(
             "forecasting_status": entry["forecasting_status"],
         }
     else:
-        values, index = _read_forecasting_csv(raw_files[0], entry["date_column"])
+        values, index, signal_columns = _read_forecasting_csv(
+            raw_files[0], entry["date_column"]
+        )
         _validate_shape(canonical, values, entry, strict_shape)
         _validate_time_axis(canonical, index, entry["frequency_minutes"], strict_shape)
         timestamp_values = _timestamp_features(index)
@@ -167,8 +172,12 @@ def prepare_dataset(
                 output_dir / f"{split_name}_timestamps.npy",
                 timestamp_values[split_slice],
             )
+            np.save(
+                output_dir / f"{split_name}_time_index.npy",
+                index[split_slice].to_numpy(dtype="datetime64[ns]"),
+            )
         fingerprint_payload = {
-            "schema_version": 1,
+            "schema_version": 2,
             "name": canonical,
             "source_sha256": _sha256(raw_files[0]),
             "shape": list(values.shape),
@@ -193,10 +202,12 @@ def prepare_dataset(
             "split_lengths": {name: split_slice.stop - split_slice.start for name, split_slice in slices.items()},
             "validation_test_context": context,
             "timestamp_features": ["time_of_day", "day_of_week", "day_of_month", "day_of_year"],
+            "time_index_encoding": "datetime64[ns]",
+            "signal_columns": signal_columns,
             "source_files": [str(raw_files[0])],
             "source_sha256": fingerprint_payload["source_sha256"],
             "data_fingerprint": _data_fingerprint(fingerprint_payload),
-            "metadata_schema_version": 1,
+            "metadata_schema_version": 2,
             "retains_full_series": True,
         }
 
@@ -217,7 +228,7 @@ def load_profile_segments(dataset_name: str, prefer_raw: bool = True) -> List[Se
         except FileNotFoundError:
             raw_files = ()
         if raw_files and entry["task"] == "forecasting":
-            values, _ = _read_forecasting_csv(raw_files[0], entry["date_column"])
+            values, _, _ = _read_forecasting_csv(raw_files[0], entry["date_column"])
             return [("raw", values)]
         if raw_files and entry["task"] == "classification":
             arrays = [np.loadtxt(path, dtype=np.float64) for path in raw_files]

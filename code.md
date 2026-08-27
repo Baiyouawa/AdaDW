@@ -404,6 +404,7 @@ test  = [val_end - input_length, end)
 datasets/processed/<dataset>/
   train_data.npy / val_data.npy / test_data.npy
   train_timestamps.npy / val_timestamps.npy / test_timestamps.npy
+  train_time_index.npy / val_time_index.npy / test_time_index.npy
   meta.json
 ```
 
@@ -660,7 +661,8 @@ inputs.npy, prediction.npy, targets.npy
 ```
 
 因此容量预实验必须使用 `artifact_policy=full`。正式 benchmark 默认
-`artifact_policy=metrics`，成功后会删除整个 checkpoint 目录，所以正式 RAW manifest 不能
+`artifact_policy=metrics`，评估时只选择性捕获预注册的固定窗口，导出原始量纲
+`forecast_slice.csv/forecast_vs_target.png`，再删除整个 checkpoint 目录，所以正式 RAW manifest 不能
 再直接用于局部损失分析。
 
 ### 7.2 局部误差定义
@@ -1098,8 +1100,9 @@ test TensorBoard 曲线，最终 test 指标以 `test_metrics.json/manifest.json
 ### 14.3 TensorBoard 文件是否保留
 
 - 容量预实验默认 `artifact_policy=full`：checkpoint 目录和 TensorBoard event 文件保留；
-- 正式 benchmark 默认 `artifact_policy=metrics`：读取指标后删除 checkpoint 目录，TensorBoard
-  event 也随之删除，只在 manifest 中保留最终指标和效率。
+- 正式 benchmark 默认 `artifact_policy=metrics`：test loader 只捕获一个预注册窗口，读取指标
+  并生成紧凑预测切片/PNG 后删除 checkpoint 目录和临时样本数组；manifest 保留最终指标、效率和
+  可视化元数据。
 
 因此正式实验结束后想画训练曲线，必须事先修改 artifact policy 或单独备份 event 文件；不能
 期望从 `summary.csv` 恢复逐 epoch 曲线。

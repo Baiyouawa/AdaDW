@@ -119,6 +119,7 @@ class BasicTSRunner:
         self.eval_horizons = \
             [x - 1 for x in eval_horizons] if eval_horizons else None
         self.save_results = cfg.save_results
+        self.result_sample_indices = cfg.get("result_sample_indices", None)
 
         # define loss function
         if isinstance(cfg.loss, nn.Module):
@@ -1063,44 +1064,110 @@ class BasicTSRunner:
             }
         """
 
+        total_samples = len(self.test_data_loader.dataset)
+
+        # Selective capture avoids transferring every high-dimensional test
+        # prediction to CPU when only a pre-registered window is needed.
+        if batch_idx > 0 and self._result_sample_indices is not None:
+            batch_size = batch_data["inputs"].shape[0]
+            start = self._results_seen_offset
+            end = start + batch_size
+            if end > total_samples:
+                raise RuntimeError(
+                    f"Result batch exceeds allocated storage: end={end}, total={total_samples}"
+                )
+            selected_mask = (
+                (self._result_sample_indices >= start)
+                & (self._result_sample_indices < end)
+            )
+            if not bool(selected_mask.any()):
+                self._results_seen_offset = end
+                if end >= total_samples:
+                    if self._results_write_offset != len(self._result_sample_indices):
+                        raise RuntimeError(
+                            "Evaluation ended before all registered result samples were captured"
+                        )
+                    self._inputs_memmap.flush()
+                    self._prediction_memmap.flush()
+                    self._targets_memmap.flush()
+                return
+
         inputs = batch_data["inputs"].detach().cpu().numpy()
         prediction = batch_data["prediction"].detach().cpu().numpy()
         targets = batch_data["targets"].detach().cpu().numpy()
-
-        total_samples = len(self.test_data_loader.dataset)
 
         save_dir = os.path.join(self.ckpt_save_dir, "test_results")
         os.makedirs(save_dir, exist_ok=True)
         inputs_path = os.path.join(save_dir, "inputs.npy")
         pred_path = os.path.join(save_dir, "prediction.npy")
         targets_path = os.path.join(save_dir, "targets.npy")
+        sample_indices_path = os.path.join(save_dir, "sample_indices.npy")
 
-        # Create valid .npy memmaps so downstream local-loss analysis can use
-        # np.load(..., mmap_mode="r") without separately tracking raw shapes.
+        # Create valid .npy memmaps. Full runs remain compatible with local-loss
+        # analysis; selective runs additionally persist the original sample IDs.
         if batch_idx == 0:
+            self._results_seen_offset = 0
             self._results_write_offset = 0
+            selected = getattr(self, "result_sample_indices", None)
+            if selected is not None:
+                selected = sorted({int(index) for index in selected})
+                if not selected or selected[0] < 0 or selected[-1] >= total_samples:
+                    raise ValueError(
+                        f"Invalid result_sample_indices={selected} for {total_samples} samples"
+                    )
+                self._result_sample_indices = np.asarray(selected, dtype=np.int64)
+                np.save(sample_indices_path, self._result_sample_indices)
+                stored_samples = len(selected)
+            else:
+                self._result_sample_indices = None
+                stored_samples = total_samples
+                if os.path.isfile(sample_indices_path):
+                    os.remove(sample_indices_path)
             self._inputs_memmap = np.lib.format.open_memmap(
                 inputs_path, dtype=inputs.dtype, mode="w+",
-                shape=(total_samples, *inputs.shape[1:]))
+                shape=(stored_samples, *inputs.shape[1:]))
             self._prediction_memmap = np.lib.format.open_memmap(
                 pred_path, dtype=prediction.dtype, mode="w+",
-                shape=(total_samples, *prediction.shape[1:]))
+                shape=(stored_samples, *prediction.shape[1:]))
             self._targets_memmap = np.lib.format.open_memmap(
                 targets_path, dtype=targets.dtype, mode="w+",
-                shape=(total_samples, *targets.shape[1:]))
+                shape=(stored_samples, *targets.shape[1:]))
 
-        start = self._results_write_offset
+        start = self._results_seen_offset
         end = start + inputs.shape[0]
         if end > total_samples:
             raise RuntimeError(
                 f"Result batch exceeds allocated storage: end={end}, total={total_samples}"
             )
 
-        self._inputs_memmap[start:end] = inputs
-        self._prediction_memmap[start:end] = prediction
-        self._targets_memmap[start:end] = targets
-        self._results_write_offset = end
+        if self._result_sample_indices is None:
+            write_start = self._results_write_offset
+            write_end = write_start + inputs.shape[0]
+            self._inputs_memmap[write_start:write_end] = inputs
+            self._prediction_memmap[write_start:write_end] = prediction
+            self._targets_memmap[write_start:write_end] = targets
+            self._results_write_offset = write_end
+        else:
+            selected_mask = (
+                (self._result_sample_indices >= start)
+                & (self._result_sample_indices < end)
+            )
+            destination = np.flatnonzero(selected_mask)
+            if len(destination):
+                local = self._result_sample_indices[selected_mask] - start
+                self._inputs_memmap[destination] = inputs[local]
+                self._prediction_memmap[destination] = prediction[local]
+                self._targets_memmap[destination] = targets[local]
+                self._results_write_offset += len(destination)
+        self._results_seen_offset = end
         if end >= total_samples:
+            if (
+                self._result_sample_indices is not None
+                and self._results_write_offset != len(self._result_sample_indices)
+            ):
+                raise RuntimeError(
+                    "Evaluation ended before all registered result samples were captured"
+                )
             self._inputs_memmap.flush()
             self._prediction_memmap.flush()
             self._targets_memmap.flush()

@@ -21,6 +21,9 @@ pre_experiments/results/forecasting_raw/**
 !pre_experiments/results/forecasting_raw/summary/per_seed.csv
 !pre_experiments/results/forecasting_raw/summary/summary.csv
 !pre_experiments/results/forecasting_raw/summary/coverage.csv
+!pre_experiments/results/forecasting_raw/summary/visualization_index.csv
+!pre_experiments/results/forecasting_raw/summary/visualizations/
+!pre_experiments/results/forecasting_raw/summary/visualizations/*.png
 !pre_experiments/results/forecasting_smoke/
 pre_experiments/results/forecasting_smoke/**
 !pre_experiments/results/forecasting_smoke/plan.csv
@@ -29,6 +32,9 @@ pre_experiments/results/forecasting_smoke/**
 !pre_experiments/results/forecasting_smoke/summary/per_seed.csv
 !pre_experiments/results/forecasting_smoke/summary/summary.csv
 !pre_experiments/results/forecasting_smoke/summary/coverage.csv
+!pre_experiments/results/forecasting_smoke/summary/visualization_index.csv
+!pre_experiments/results/forecasting_smoke/summary/visualizations/
+!pre_experiments/results/forecasting_smoke/summary/visualizations/*.png
 !pre_experiments/results/**/
 !pre_experiments/results/**/.gitkeep
 

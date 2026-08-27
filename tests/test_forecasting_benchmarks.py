@@ -1,6 +1,10 @@
 import pandas as pd
 
-from pre_experiments.run_forecasting_benchmarks import build_plan, load_config
+from pre_experiments.run_forecasting_benchmarks import (
+    build_plan,
+    load_config,
+    training_command,
+)
 from pre_experiments.summarize_forecasting_benchmarks import (
     aggregate_runs,
     coverage,
@@ -17,11 +21,17 @@ def test_default_forecasting_plan_contains_864_runs():
     assert len(plan) == 8 * 9 * 4 * 3 == 864
     assert len({run.protocol_signature for run in plan}) == 864
     assert len({run.run_id for run in plan}) == 864
+    assert {run.visualize_forecast for run in plan} == {True}
+    assert {run.visualization_sample_position for run in plan} == {0.5}
+    assert {run.visualization_max_channels for run in plan} == {4}
     assert config["seeds"] == [3407, 3408, 3409]
     ili_horizons = {run.horizon for run in plan if run.dataset == "ILI"}
     ett_horizons = {run.horizon for run in plan if run.dataset == "ETTh1"}
     assert ili_horizons == {24, 36, 48, 60}
     assert ett_horizons == {96, 192, 336, 720}
+    command = training_command(plan[0], config, __import__("pathlib").Path("runs"), "0")
+    assert "--visualize-forecast" in command
+    assert command[command.index("--visualization-sample-position") + 1] == "0.5"
 
 
 def test_smoke_plan_contains_one_epoch_per_model_and_dataset():

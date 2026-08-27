@@ -5,9 +5,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import pandas as pd
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+from adawd_preexp.forecast_visualization import (
+    build_baseline_comparison_visualizations,
+)
 
 
 IDENTIFIERS = ["model", "dataset", "output_length"]
@@ -33,13 +42,14 @@ def collect_runs(runs_root: Path) -> pd.DataFrame:
             "protocol_signature": manifest.get("protocol_signature"),
             "data_fingerprint": manifest.get("data_fingerprint"),
             "run_id": manifest["run_id"],
+            "visualization_slice": (manifest.get("visualization") or {}).get("slice_csv"),
         }
         row.update({name: float(value) for name, value in overall.items()})
         rows.append(row)
     columns = [
         "model", "dataset", "output_length", "seed", "epochs", "batch_size",
         "metric_scale", "protocol_signature", "data_fingerprint", "run_id",
-        "MAE", "MSE", "RMSE",
+        "visualization_slice", "MAE", "MSE", "RMSE",
     ]
     return pd.DataFrame(rows, columns=columns)
 
@@ -116,6 +126,7 @@ def format_metric(row, name: str) -> str:
 def write_markdown(
     summary: pd.DataFrame,
     coverage_frame: pd.DataFrame,
+    visualization_index: pd.DataFrame,
     expected_seeds: list[int],
     path: Path,
 ) -> None:
@@ -128,7 +139,9 @@ def write_markdown(
         + ", ".join(str(seed) for seed in expected_seeds)
         + ".",
         "MAE, MSE and RMSE are computed in the per-channel ZScore-normalized space.",
-        "Successful runs retain metrics and efficiency metadata only; checkpoints are deleted.",
+        "Successful runs retain metrics, efficiency metadata and a compact original-scale "
+        "forecast visualization. Evaluation captures only the registered sample; "
+        "checkpoints and temporary sample arrays are deleted.",
         "",
         "| Model | Dataset | Horizon | Epochs | Batch | Seeds | MSE | MAE | RMSE | Complete |",
         "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
@@ -140,6 +153,36 @@ def write_markdown(
                 f"| {row.batch_size} | {row.seed_count} | {format_metric(row, 'MSE')} "
                 f"| {format_metric(row, 'MAE')} | {format_metric(row, 'RMSE')} "
                 f"| {'yes' if row.complete else 'no'} |"
+            )
+    lines.extend(
+        [
+            "",
+            "## Forecast Visualizations",
+            "",
+            "The plotted test window is selected at a configured fixed position in the "
+            "test interval shared by all four horizons (50% in the default protocol), and up to "
+            "four channels are selected by evenly spaced channel IDs. Selection never uses "
+            "targets or prediction errors. Curves are in the original data scale; each "
+            "Backbone line is the mean across available seeds and its band is one sample "
+            "standard deviation.",
+            "",
+        ]
+    )
+    if visualization_index.empty:
+        lines.append("No forecast visualization is available yet.")
+    else:
+        lines.extend(
+            [
+                "| Dataset | Horizon | Models | Runs | Complete | Position | Window | Plot |",
+                "| --- | ---: | ---: | ---: | --- | ---: | ---: | --- |",
+            ]
+        )
+        for row in visualization_index.itertuples(index=False):
+            lines.append(
+                f"| {row.dataset} | {row.horizon} | {row.model_count} | {row.run_count} "
+                f"| {'yes' if row.complete else 'no'} | {row.sample_position:.0%} "
+                f"| {row.sample_index} "
+                f"| [PNG]({row.plot_png}) |"
             )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -156,10 +199,27 @@ def main() -> None:
     summary = aggregate_runs(runs, args.seeds)
     coverage_frame = coverage(plan, runs)
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    model_order = list(dict.fromkeys(plan["model"].tolist()))
+    visualization_index = build_baseline_comparison_visualizations(
+        runs=runs,
+        runs_root=args.runs_root,
+        output_dir=args.output_dir,
+        model_order=model_order,
+        expected_seeds=args.seeds,
+    )
     runs.to_csv(args.output_dir / "per_seed.csv", index=False)
     summary.to_csv(args.output_dir / "summary.csv", index=False)
     coverage_frame.to_csv(args.output_dir / "coverage.csv", index=False)
-    write_markdown(summary, coverage_frame, args.seeds, args.output_dir / "Result.md")
+    visualization_index.to_csv(
+        args.output_dir / "visualization_index.csv", index=False
+    )
+    write_markdown(
+        summary,
+        coverage_frame,
+        visualization_index,
+        args.seeds,
+        args.output_dir / "Result.md",
+    )
     print(f"completed_runs={len(runs)}/{len(plan)}")
     print(
         f"complete_seed_groups="

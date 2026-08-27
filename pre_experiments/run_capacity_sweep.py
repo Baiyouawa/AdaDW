@@ -12,6 +12,8 @@ import time
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
+import numpy as np
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT / "Baselines"))
@@ -19,6 +21,10 @@ sys.path.insert(0, str(PROJECT_ROOT / "Baselines"))
 from adawd_preexp.capacity import build_model, plan_sweep, timestamp_sizes
 from adawd_preexp.catalog import load_preexperiment_config, resolve_dataset
 from adawd_preexp.efficiency import measure_efficiency
+from adawd_preexp.forecast_visualization import (
+    export_run_forecast_visualization,
+    select_sample_index,
+)
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -42,6 +48,9 @@ def execute(
     early_stopping_patience: int | None = None,
     data_fingerprint: str | None = None,
     protocol_signature: str | None = None,
+    visualize_forecast: bool = False,
+    visualization_sample_position: float = 0.5,
+    visualization_max_channels: int = 4,
 ) -> None:
     if gpu is not None:
         os.environ["CUDA_VISIBLE_DEVICES"] = gpu
@@ -60,6 +69,19 @@ def execute(
     data_path = PROJECT_ROOT / "datasets" / "processed" / run.dataset
     if not (data_path / "train_data.npy").is_file():
         raise FileNotFoundError(f"Prepare {run.dataset} first; missing {data_path / 'train_data.npy'}")
+    if visualize_forecast:
+        required_visualization_files = [
+            data_path / "meta.json",
+            data_path / "test_time_index.npy",
+        ]
+        missing_visualization_files = [
+            str(path) for path in required_visualization_files if not path.is_file()
+        ]
+        if missing_visualization_files:
+            raise FileNotFoundError(
+                "Re-prepare the dataset before forecast visualization; missing "
+                f"{missing_visualization_files}"
+            )
     if data_fingerprint is not None:
         meta_path = data_path / "meta.json"
         if not meta_path.is_file():
@@ -86,6 +108,11 @@ def execute(
         checkpoint_dir=str(checkpoint_dir),
         protocol_signature=protocol_signature,
         data_fingerprint=data_fingerprint,
+        visualization_config={
+            "enabled": visualize_forecast,
+            "sample_position": visualization_sample_position,
+            "max_channels": visualization_max_channels,
+        },
     )
     _write_json(run_dir / "manifest.json", manifest)
 
@@ -132,7 +159,24 @@ def execute(
             ]
         else:
             run_metrics = training["metrics"]
-        save_predictions = training["save_predictions"] and artifact_policy == "full"
+        save_predictions = visualize_forecast or (
+            training["save_predictions"] and artifact_policy == "full"
+        )
+        visualization_sample_index = None
+        result_sample_indices = None
+        if visualize_forecast:
+            test_data = np.load(data_path / "test_data.npy", mmap_mode="r")
+            common_sample_count = (
+                len(test_data)
+                - run.input_length
+                - max(int(horizon) for horizon in dataset["forecast_horizons"])
+                + 1
+            )
+            visualization_sample_index = select_sample_index(
+                common_sample_count, visualization_sample_position
+            )
+            if artifact_policy == "metrics":
+                result_sample_indices = [visualization_sample_index]
         config = BasicTSForecastingConfig(
             model=model_class,
             model_config=model_config,
@@ -151,6 +195,7 @@ def execute(
             callbacks=[EarlyStopping(patience=run_patience)],
             seed=run.seed,
             save_results=save_predictions,
+            result_sample_indices=result_sample_indices,
             eval_after_train=True,
             rescale=metric_scale == "original",
             deterministic=True,
@@ -202,6 +247,23 @@ def execute(
             if missing_results:
                 raise FileNotFoundError(f"Training finished without saved results: {missing_results}")
         metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        if visualize_forecast:
+            visualization = export_run_forecast_visualization(
+                result_dir=resolved_checkpoint_dir / "test_results",
+                processed_dir=data_path,
+                run_dir=run_dir,
+                dataset=run.dataset,
+                model=run.model,
+                horizon=run.output_length,
+                seed=run.seed,
+                input_length=run.input_length,
+                output_length=run.output_length,
+                metric_scale=metric_scale,
+                sample_position=visualization_sample_position,
+                sample_index=visualization_sample_index,
+                max_channels=visualization_max_channels,
+            )
+            manifest["visualization"] = visualization
         if artifact_policy == "metrics":
             shutil.rmtree(resolved_checkpoint_dir)
             manifest.update(checkpoint_dir=None, artifacts_removed=True)
@@ -235,6 +297,9 @@ def main() -> None:
     parser.add_argument("--early-stopping-patience", type=int)
     parser.add_argument("--data-fingerprint")
     parser.add_argument("--protocol-signature")
+    parser.add_argument("--visualize-forecast", action="store_true")
+    parser.add_argument("--visualization-sample-position", type=float, default=0.5)
+    parser.add_argument("--visualization-max-channels", type=int, default=4)
     parser.add_argument("--output-root", type=Path, help="override run output directory")
     parser.add_argument(
         "--metric-scale", choices=["normalized", "original"], default="normalized"
@@ -256,6 +321,10 @@ def main() -> None:
         parser.error("--weight-decay must be non-negative")
     if args.early_stopping_patience is not None and args.early_stopping_patience < 1:
         parser.error("--early-stopping-patience must be positive")
+    if not 0.0 <= args.visualization_sample_position <= 1.0:
+        parser.error("--visualization-sample-position must be in [0, 1]")
+    if args.visualization_max_channels < 1:
+        parser.error("--visualization-max-channels must be positive")
     runs = plan_sweep(args.model, args.dataset, args.axis, args.horizon, args.seeds)
     if args.dry_run:
         print(json.dumps([run.to_dict() for run in runs], indent=2))
@@ -280,6 +349,9 @@ def main() -> None:
             args.early_stopping_patience,
             args.data_fingerprint,
             args.protocol_signature,
+            args.visualize_forecast,
+            args.visualization_sample_position,
+            args.visualization_max_channels,
         )
 
 

@@ -23,10 +23,11 @@ from adawd_preexp.catalog import load_backbone_registry, load_dataset_catalog
 
 DEFAULT_CONFIG = PROJECT_ROOT / "pre_experiments" / "benchmark_config.json"
 DEFAULT_OUTPUT = PROJECT_ROOT / "pre_experiments" / "results" / "forecasting_raw"
-PROTOCOL_SCHEMA_VERSION = 2
+PROTOCOL_SCHEMA_VERSION = 3
 SHARED_PROTOCOL_FILES = (
     "src/adawd_preexp/capacity.py",
     "src/adawd_preexp/data.py",
+    "src/adawd_preexp/forecast_visualization.py",
     "pre_experiments/run_capacity_sweep.py",
 )
 SHARED_BASELINE_DIRS = (
@@ -55,6 +56,9 @@ class BenchmarkRun:
     learning_rate: float
     weight_decay: float
     early_stopping_patience: int
+    visualize_forecast: bool
+    visualization_sample_position: float
+    visualization_max_channels: int
     data_fingerprint: str
     protocol_signature: str
 
@@ -124,6 +128,19 @@ def load_config(path: Path) -> dict:
         raise ValueError("invalid optimizer settings")
     if int(defaults["early_stopping_patience"]) < 1:
         raise ValueError("early_stopping_patience must be positive")
+    visualization = config.get("visualization")
+    required_visualization = {"enabled", "sample_position", "max_channels"}
+    if not isinstance(visualization, dict) or set(visualization) != required_visualization:
+        raise ValueError(
+            "visualization must contain exactly: "
+            + ", ".join(sorted(required_visualization))
+        )
+    if not isinstance(visualization["enabled"], bool):
+        raise ValueError("visualization.enabled must be boolean")
+    if not 0.0 <= float(visualization["sample_position"]) <= 1.0:
+        raise ValueError("visualization.sample_position must be in [0, 1]")
+    if int(visualization["max_channels"]) < 1:
+        raise ValueError("visualization.max_channels must be positive")
     catalog = load_dataset_catalog()
     if len(catalog) != 9 or any(len(entry["forecast_horizons"]) != 4 for entry in catalog.values()):
         raise ValueError("the full benchmark requires nine datasets with four horizons each")
@@ -150,6 +167,7 @@ def build_plan(config: dict, smoke: bool = False) -> list[BenchmarkRun]:
     registry = load_backbone_registry()["models"]
     caps = config.get("dataset_batch_caps", {})
     defaults = config["training_defaults"]
+    visualization = config["visualization"]
     source_digests = {model: _source_digest(model) for model in config["models"]}
     plan = []
     for model, model_config in config["models"].items():
@@ -187,6 +205,7 @@ def build_plan(config: dict, smoke: bool = False) -> list[BenchmarkRun]:
                         "epochs": epochs,
                         "batch_size": batch_size,
                         "training": defaults,
+                        "visualization": visualization,
                         "metric_scale": config["metric_scale"],
                         "artifact_policy": config["artifact_policy"],
                         "dataset_catalog": dataset_config,
@@ -209,6 +228,9 @@ def build_plan(config: dict, smoke: bool = False) -> list[BenchmarkRun]:
                             learning_rate=float(defaults["learning_rate"]),
                             weight_decay=float(defaults["weight_decay"]),
                             early_stopping_patience=int(defaults["early_stopping_patience"]),
+                            visualize_forecast=bool(visualization["enabled"]),
+                            visualization_sample_position=float(visualization["sample_position"]),
+                            visualization_max_channels=int(visualization["max_channels"]),
                             data_fingerprint=data_fingerprint,
                             protocol_signature=_canonical_digest(protocol),
                         )
@@ -245,12 +267,19 @@ def is_complete(output_root: Path, run: BenchmarkRun, config: dict) -> bool:
         )
     except (TypeError, ValueError):
         metrics_complete = False
+    visualization = manifest.get("visualization") or {}
+    visualization_complete = not run.visualize_forecast or all(
+        isinstance(visualization.get(field), str)
+        and (path.parent / visualization[field]).is_file()
+        for field in ("slice_csv", "plot_png")
+    )
     return (
         manifest.get("status") == "complete"
         and manifest.get("run_id") == run.run_id
         and manifest.get("protocol_signature") == run.protocol_signature
         and manifest.get("data_fingerprint") == run.data_fingerprint
         and metrics_complete
+        and visualization_complete
     )
 
 
@@ -265,7 +294,7 @@ def write_plan(plan: list[BenchmarkRun], output_root: Path) -> Path:
 
 
 def training_command(run: BenchmarkRun, config: dict, output_root: Path, gpu: str) -> list[str]:
-    return [
+    command = [
         sys.executable,
         "pre_experiments/run_capacity_sweep.py",
         "--dataset", run.dataset,
@@ -288,6 +317,15 @@ def training_command(run: BenchmarkRun, config: dict, output_root: Path, gpu: st
         "--artifact-policy", config["artifact_policy"],
         "--output-root", str(output_root),
     ]
+    if run.visualize_forecast:
+        command.extend(
+            [
+                "--visualize-forecast",
+                "--visualization-sample-position", str(run.visualization_sample_position),
+                "--visualization-max-channels", str(run.visualization_max_channels),
+            ]
+        )
+    return command
 
 
 def main() -> None:

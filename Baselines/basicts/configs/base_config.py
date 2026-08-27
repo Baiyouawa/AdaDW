@@ -146,7 +146,7 @@ class BasicTSConfig(EasyDict):
          "train_data_prefetch", "train_data_num_workers", "train_data_pin_memory", \
          "val_batch_size", "val_interval", "val_data_prefetch", "val_data_num_workers", "val_data_pin_memory", \
          "test_batch_size", "test_interval", "test_data_prefetch", "test_data_num_workers", "test_data_pin_memory", \
-         "save_results", "eval_after_train"])
+         "save_results", "result_sample_indices", "eval_after_train"])
 
     #######################################################################################
 

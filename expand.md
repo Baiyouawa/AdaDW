@@ -212,7 +212,7 @@ TimesNet 的 timestamp sizes 由数据频率构造；TimeFilter 的 patch length
 6. 使用 masked MAE 训练，默认 Adam、学习率 `2e-4`、weight decay `5e-4`；
 7. 每个 epoch 验证，以验证 MAE 最小保存最佳 checkpoint，早停 patience 为 10；
 8. 训练结束加载最佳 checkpoint，在 test split 上计算 MAE/MSE/RMSE；
-9. 根据 artifact policy 保留或删除预测数组和 checkpoint；
+9. 正式 RAW 流式评估时只捕获固定测试窗口并导出原始量纲 CSV/PNG，再删除临时数组和 checkpoint；
 10. 将最终指标、效率和 `status=complete/failed` 写回 manifest。
 
 容量便捷入口没有读取 `benchmark_config.json` 的模型相关 epoch/batch，未覆盖时使用 `config.json` 的 `100 epochs + batch 64`。这与正式 RAW baseline 的模型相关预算不同，是当前代码中必须明确的协议差异。
@@ -239,7 +239,7 @@ loss_mse = mean_h (prediction - target)^2
 
 在 `metric_scale=normalized` 时，保存的 inputs/prediction/targets 位于逐通道 ZScore 空间。`U/M` 内部还会对每个通道做 robust scale，因此对平移和正比例缩放基本不敏感，但正式报告仍应注明前文画像读取原始序列、容量画像读取模型实际使用的标准化输入。
 
-容量 run 必须使用 `artifact_policy=full`。正式 RAW 默认 `artifact_policy=metrics`，成功后会删除预测数组。两类 run 不能放在同一 `runs-root` 后直接执行 `build_local_losses.py`，因为脚本会尝试读取目录下每个 complete manifest 的预测数组，遇到 metrics-only RAW run 会报缺文件。
+容量 run 必须使用 `artifact_policy=full`。正式 RAW 默认 `artifact_policy=metrics`，评估时不写完整测试集预测，只选择性捕获固定窗口，成功后仅保留紧凑预测切片和 PNG。两类 run 不能放在同一 `runs-root` 后直接执行 `build_local_losses.py`，因为脚本会尝试读取目录下每个 complete manifest 的完整预测数组，遇到 metrics-only RAW run 会报缺文件。
 
 ### 3.6 饱和深度、饱和宽度和统计诊断
 
@@ -485,7 +485,7 @@ deterministic: true
 | 目的 | 估计局部 d_sat/w_sat 与 U/M 的关系 | 比较正常预测精度和效率 |
 | axis | depth/width/joint | raw |
 | horizon | 主实验先用最短 horizon | 全部 4 个 horizon |
-| artifacts | `full`，必须保存预测数组 | `metrics`，成功后删除 checkpoint/数组 |
+| artifacts | `full`，必须保存预测数组 | `metrics`，保留紧凑切片/图，删除 checkpoint/完整数组 |
 | epoch/batch | 同一容量曲线严格固定 | 按 benchmark_config 的模型配置 |
 | 输出目录 | `results/capacity_main` | `results/forecasting_raw` |
 
@@ -512,7 +512,7 @@ pixi run forecast-smoke
 pixi run forecast-all
 ```
 
-可以用 `--start-index/--stop-index` 按 `plan.csv` 分片。恢复时只有 manifest 的 status、epoch、batch、metric scale 和 artifact policy 都与当前计划一致才会跳过。需要注意，最终 summarizer 与 plan 做内连接时只匹配 model/dataset/horizon/seed/epoch/batch，没有再次过滤 metric scale 和 artifact policy；因此正式输出目录应只保存单一协议，后续调度器还应加入协议 hash。
+可以用 `--start-index/--stop-index` 按 `plan.csv` 分片。恢复时要求 manifest 状态、有限的 MAE/MSE/RMSE、数据指纹、完整协议签名以及预测切片/PNG 全部匹配；缺少任何一项都不会跳过。summarizer 同样按 `run_id + protocol_signature + data_fingerprint` 与当前 plan 做严格内连接，不会把旧配置结果混入新汇总。
 
 [`pre_experiments/summarize_forecasting_benchmarks.py`](pre_experiments/summarize_forecasting_benchmarks.py) 当前生成：
 
@@ -520,6 +520,8 @@ pixi run forecast-all
 per_seed.csv: model/dataset/horizon/seed 的 MAE/MSE/RMSE
 summary.csv:  三种 seed 的 mean 和 sample std
 coverage.csv: 864 项 complete/pending 覆盖率
+visualization_index.csv: 36 组 dataset/horizon 对比图的模型与 seed 覆盖率
+visualizations/*.png: 原始量纲的真实值与八模型预测对比
 Result.md:    summary.csv 的 Markdown 表
 ```
 
