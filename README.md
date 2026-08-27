@@ -15,7 +15,12 @@
 
 当前可运行 8 个 Backbone：Crossformer、PatchTST、TimesNet、iTransformer、TimeMixer、WPMixer、TimeFilter 和 MultiPatchFormer。
 
-前三个 2025 模型已从论文作者公开的官方仓库接入；具体来源、commit 和适配说明见 `Baselines/README.md`。
+WPMixer 基于有许可证的官方实现适配；TimeFilter 和 MultiPatchFormer 是依据论文结构编写的
+独立 BasicTS 适配器。具体来源、commit 和边界见 `Baselines/README.md`。
+
+完整的静态矩阵、Baseline 配置、数据泄露检查和剩余风险见
+[`REPOSITORY_AUDIT.md`](REPOSITORY_AUDIT.md)。当前正式 RAW benchmark 仍为 `0/864`，
+因此“静态链路完整”不能表述成“全部组合已经实际运行通过”。
 
 > **Electricity 数据身份待确认**：当前代码按 DropoutTS 使用的 321 通道 LTSF Electricity
 > 基准配置。论文草稿中的“家庭电参量及分表计量”对应另一套数据。正式下载和报告实验前必须选择其中一套，不能混用名称。
@@ -44,7 +49,7 @@ AdaWD/
 后续命令均假设当前目录为：
 
 ```bash
-cd /home/devcontainers/ICLR/Exp/AdaWD
+cd AdaDW
 ```
 
 ## 3. Pixi 运行环境与一键任务
@@ -79,6 +84,9 @@ pixi run preexp-width
 完整 RAW 时序预测基准使用 8 个模型、9 个数据集、每个数据集注册的 4 个
 horizon，以及随机种子 3407/3408/3409：
 
+正式启动前必须用当前版本重新执行 `pixi run prepare-datasets`。旧版 `meta.json` 没有数据
+指纹，runner 会拒绝复用，以免旧切分或旧预处理结果混入新协议。
+
 ```bash
 # 仅生成并检查 864-run 计划，不训练
 pixi run forecast-all-plan
@@ -98,8 +106,9 @@ Smoke 模式为每个模型/数据集选择最短 horizon、seed 3407 和 1 epoc
 训练、验证、预测、指标落盘和 checkpoint 清理链路，不用于比较模型精度。正式任务
 仍使用 `benchmark_config.json` 中的标准 epoch。
 
-模型训练轮数和 batch size 位于 `pre_experiments/benchmark_config.json`，按各模型
-官方训练代码设置；Electricity 和 Traffic 另有显存安全上限。正式指标为逐通道
+八个模型的显式架构配置位于 `Baselines/registry.json`，模型训练轮数和 batch size 位于
+`pre_experiments/benchmark_config.json`；Electricity 和 Traffic 另有显存安全上限。该配置是
+本项目预注册的统一比较协议，不等于逐项复刻所有官方脚本。正式指标为逐通道
 ZScore 空间的 MAE/MSE/RMSE，每组三个 seed 输出 mean 和 sample std。成功 run 仅保留
 manifest 中的指标与效率记录，测试完成后删除 checkpoint 和预测数组。
 
@@ -362,14 +371,14 @@ U/M 是多个有界描述分量的平均值，不是概率，`0.2-0.4` 的均值
 - 深度候选：`D={1,2,4,8}`；
 - 宽度组候选：`W={1,2,4,8}`；
 - 二维候选：`D={2,4,8} x W={2,4,8}`；
-- 随机种子：`42,43,44`；
+- 容量配置默认随机种子：`3407,3408,3409`；便捷 pilot 命令可显式使用 seed 42；
 - 普通数据集：输入长度 96，预测长度 96/192/336/720；
 - ILI：输入长度 24，预测长度 24/36/48/60；
 - 训练指标：MAE、MSE、RMSE、MAPE、WAPE。
 
 参数位于 [`pre_experiments/config.json`](pre_experiments/config.json)。四种轴的含义：
 
-- `raw`：原始 Backbone 默认深度和宽度；
+- `raw`：`registry.json` 中该 Backbone 的显式 `benchmark_config`；
 - `depth`：固定 RAW 宽度，只改变深度；
 - `width`：固定 RAW 深度，只改变宽度；
 - `joint`：运行二维深宽组合。
@@ -494,7 +503,7 @@ pre_experiments/results/runs/<run_id>/
 `manifest.json` 包含：
 
 - 数据集、模型、预测长度、深度、宽度和种子；
-- MAE、MSE、RMSE、MAPE、WAPE；
+- 配置要求的指标；正式 normalized RAW benchmark 为 MAE、MSE、RMSE；
 - 总参数量和可训练参数量；
 - FLOPs，若当前算子不支持则记录失败原因；
 - 训练总时间、推理延迟中位数和 P90、吞吐量及 CUDA 峰值显存。

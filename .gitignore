@@ -31,3 +31,23 @@ pre_experiments/results/forecasting_smoke/**
 !pre_experiments/results/forecasting_smoke/summary/coverage.csv
 !pre_experiments/results/**/
 !pre_experiments/results/**/.gitkeep
+
+# Curated, reproducible reports and figures are publication artifacts.
+!pre_experiments/results/profiles/
+pre_experiments/results/profiles/**
+!pre_experiments/results/profiles/*/
+!pre_experiments/results/profiles/*/summary.json
+!pre_experiments/results/profiles/*/windows.csv
+!pre_experiments/results/profiles/*/U_heatmap.pdf
+!pre_experiments/results/profiles/*/M_heatmap.pdf
+!pre_experiments/results/profiles/*/UM_temporal_trajectory.pdf
+!pre_experiments/results/model_trajectories/
+pre_experiments/results/model_trajectories/**
+!pre_experiments/results/model_trajectories/experiment_report.md
+!pre_experiments/results/model_trajectories/fixed_capacity_gap.csv
+!pre_experiments/results/model_trajectories/fixed_capacity_vs_oracle.pdf
+!pre_experiments/results/model_trajectories/fixed_capacity_vs_oracle.png
+!pre_experiments/results/model_trajectories/local_losses.csv
+!pre_experiments/results/model_trajectories/model_capacity_correlations.json
+!pre_experiments/results/model_trajectories/model_capacity_temporal_trajectories.pdf
+!pre_experiments/results/model_trajectories/model_capacity_trajectories.csv

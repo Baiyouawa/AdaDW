@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Sequence, Tuple
@@ -25,7 +26,47 @@ def _read_forecasting_csv(path: Path, date_column: str) -> Tuple[np.ndarray, pd.
     values = numeric.to_numpy(dtype=np.float64)
     if values.ndim != 2 or values.shape[1] == 0:
         raise ValueError(f"{path} contains no signal columns")
+    if not np.isfinite(values).all():
+        raise ValueError(f"{path} contains NaN or infinite signal values")
     return values, timestamps
+
+
+def _validate_time_axis(
+    name: str,
+    index: pd.DatetimeIndex,
+    frequency_minutes: int,
+    strict: bool,
+) -> None:
+    if index.hasnans:
+        raise ValueError(f"{name} contains missing timestamps")
+    if index.has_duplicates:
+        raise ValueError(f"{name} contains duplicate timestamps")
+    if not index.is_monotonic_increasing:
+        raise ValueError(f"{name} timestamps are not strictly chronological")
+    if len(index) < 2:
+        raise ValueError(f"{name} must contain at least two timestamps")
+    expected = pd.Timedelta(minutes=int(frequency_minutes))
+    deltas = index[1:] - index[:-1]
+    if not bool((deltas == expected).all()):
+        message = f"{name} timestamp spacing differs from the catalog frequency {expected}"
+        if strict:
+            raise ValueError(message)
+        warnings.warn(message, stacklevel=2)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _data_fingerprint(payload: Dict[str, Any]) -> str:
+    encoded = json.dumps(
+        payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _validate_shape(name: str, values: np.ndarray, entry: Dict[str, Any], strict: bool) -> None:
@@ -99,9 +140,22 @@ def prepare_dataset(
     else:
         values, index = _read_forecasting_csv(raw_files[0], entry["date_column"])
         _validate_shape(canonical, values, entry, strict_shape)
+        _validate_time_axis(canonical, index, entry["frequency_minutes"], strict_shape)
         timestamp_values = _timestamp_features(index)
         train_end, val_end = _split_bounds(len(values), entry["split"])
         context = int(entry["forecast_input_length"])
+        max_horizon = max(int(value) for value in entry["forecast_horizons"])
+        target_bounds = {
+            "train": [0, train_end],
+            "val": [train_end, val_end],
+            "test": [val_end, len(values)],
+        }
+        for split_name, (start, stop) in target_bounds.items():
+            if stop - start < max_horizon:
+                raise ValueError(
+                    f"{canonical} {split_name} target interval is shorter than max horizon "
+                    f"{max_horizon}: {stop - start}"
+                )
         slices = {
             "train": slice(0, train_end),
             "val": slice(train_end - context, val_end),
@@ -113,6 +167,20 @@ def prepare_dataset(
                 output_dir / f"{split_name}_timestamps.npy",
                 timestamp_values[split_slice],
             )
+        fingerprint_payload = {
+            "schema_version": 1,
+            "name": canonical,
+            "source_sha256": _sha256(raw_files[0]),
+            "shape": list(values.shape),
+            "frequency_minutes": int(entry["frequency_minutes"]),
+            "input_length": context,
+            "horizons": [int(value) for value in entry["forecast_horizons"]],
+            "target_bounds": target_bounds,
+            "storage_bounds": {
+                name: [int(split_slice.start), int(split_slice.stop)]
+                for name, split_slice in slices.items()
+            },
+        }
         metadata = {
             "name": canonical,
             "task": entry["task"],
@@ -120,10 +188,15 @@ def prepare_dataset(
             "frequency_minutes": entry["frequency_minutes"],
             "shape": list(values.shape),
             "split": entry["split"],
+            "target_bounds": target_bounds,
+            "storage_bounds": fingerprint_payload["storage_bounds"],
             "split_lengths": {name: split_slice.stop - split_slice.start for name, split_slice in slices.items()},
             "validation_test_context": context,
             "timestamp_features": ["time_of_day", "day_of_week", "day_of_month", "day_of_year"],
             "source_files": [str(raw_files[0])],
+            "source_sha256": fingerprint_payload["source_sha256"],
+            "data_fingerprint": _data_fingerprint(fingerprint_payload),
+            "metadata_schema_version": 1,
             "retains_full_series": True,
         }
 

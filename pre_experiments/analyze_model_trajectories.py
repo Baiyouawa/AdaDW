@@ -117,6 +117,12 @@ def analyze(
     metric: str = "loss_mse",
     epsilon: float | None = None,
 ) -> list[Path]:
+    losses = Path(losses)
+    if not losses.is_file():
+        raise FileNotFoundError(
+            f"Loss table not found: {losses}. "
+            "Run `pixi run model-preexp-losses` first."
+        )
     config = load_preexperiment_config()
     tolerance = (
         config["model_trajectory"]["selection_tolerance"]

@@ -15,6 +15,8 @@ def test_default_forecasting_plan_contains_864_runs():
     plan = build_plan(config)
 
     assert len(plan) == 8 * 9 * 4 * 3 == 864
+    assert len({run.protocol_signature for run in plan}) == 864
+    assert len({run.run_id for run in plan}) == 864
     assert config["seeds"] == [3407, 3408, 3409]
     ili_horizons = {run.horizon for run in plan if run.dataset == "ILI"}
     ett_horizons = {run.horizon for run in plan if run.dataset == "ETTh1"}
@@ -45,6 +47,8 @@ def test_seed_aggregation_and_coverage():
             "epochs": [10] * 3,
             "batch_size": [32] * 3,
             "metric_scale": ["normalized"] * 3,
+            "protocol_signature": ["p"] * 3,
+            "data_fingerprint": ["d"] * 3,
             "run_id": ["a", "b", "c"],
             "MSE": [0.2, 0.3, 0.4],
             "MAE": [0.1, 0.2, 0.3],
@@ -60,6 +64,9 @@ def test_seed_aggregation_and_coverage():
             "seed": [3407, 3408, 3409, 3410],
             "epochs": [10] * 4,
             "batch_size": [32] * 4,
+            "run_id": ["a", "b", "c", "d"],
+            "protocol_signature": ["p"] * 4,
+            "data_fingerprint": ["d"] * 4,
         }
     )
 
@@ -82,6 +89,8 @@ def test_runs_with_a_different_training_protocol_are_excluded():
             "epochs": [100],
             "batch_size": [64],
             "metric_scale": ["normalized"],
+            "protocol_signature": ["old-protocol"],
+            "data_fingerprint": ["d"],
             "run_id": ["old"],
             "MAE": [0.1],
             "MSE": [0.2],
@@ -96,6 +105,9 @@ def test_runs_with_a_different_training_protocol_are_excluded():
             "seed": [3407],
             "epochs": [20],
             "batch_size": [32],
+            "run_id": ["new"],
+            "protocol_signature": ["new-protocol"],
+            "data_fingerprint": ["d"],
         }
     )
 

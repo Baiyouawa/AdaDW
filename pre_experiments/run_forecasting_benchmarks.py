@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
+import math
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
@@ -15,11 +17,27 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from adawd_preexp.catalog import PROJECT_ROOT as CATALOG_PROJECT_ROOT
 from adawd_preexp.catalog import load_backbone_registry, load_dataset_catalog
 
 
 DEFAULT_CONFIG = PROJECT_ROOT / "pre_experiments" / "benchmark_config.json"
 DEFAULT_OUTPUT = PROJECT_ROOT / "pre_experiments" / "results" / "forecasting_raw"
+PROTOCOL_SCHEMA_VERSION = 2
+SHARED_PROTOCOL_FILES = (
+    "src/adawd_preexp/capacity.py",
+    "src/adawd_preexp/data.py",
+    "pre_experiments/run_capacity_sweep.py",
+)
+SHARED_BASELINE_DIRS = (
+    "Baselines/basicts/configs",
+    "Baselines/basicts/data",
+    "Baselines/basicts/metrics",
+    "Baselines/basicts/modules",
+    "Baselines/basicts/runners",
+    "Baselines/basicts/scaler",
+    "Baselines/basicts/utils",
+)
 
 
 @dataclass(frozen=True)
@@ -29,8 +47,46 @@ class BenchmarkRun:
     dataset: str
     horizon: int
     seed: int
+    run_id: str
     epochs: int
     batch_size: int
+    loss: str
+    target_metric: str
+    learning_rate: float
+    weight_decay: float
+    early_stopping_patience: int
+    data_fingerprint: str
+    protocol_signature: str
+
+
+def _canonical_digest(value: object) -> str:
+    payload = json.dumps(
+        value, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _source_digest(model: str) -> str:
+    paths = [PROJECT_ROOT / relative for relative in SHARED_PROTOCOL_FILES]
+    for relative in SHARED_BASELINE_DIRS:
+        paths.extend(sorted((PROJECT_ROOT / relative).rglob("*.py")))
+    paths.extend(sorted((PROJECT_ROOT / "Baselines" / "basicts" / "models" / model).rglob("*.py")))
+    digest = hashlib.sha256()
+    for path in paths:
+        relative = path.relative_to(PROJECT_ROOT).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _data_fingerprint(dataset: str) -> str:
+    meta_path = CATALOG_PROJECT_ROOT / "datasets" / "processed" / dataset / "meta.json"
+    if not meta_path.is_file():
+        return "unprepared"
+    metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+    return str(metadata.get("data_fingerprint", "legacy-metadata"))
 
 
 def load_config(path: Path) -> dict:
@@ -48,12 +104,53 @@ def load_config(path: Path) -> dict:
         )
     if len(set(config["seeds"])) != len(config["seeds"]):
         raise ValueError("benchmark seeds must be unique")
+    if len(config["seeds"]) != 3:
+        raise ValueError("the full benchmark requires exactly three seeds")
+    defaults = config.get("training_defaults")
+    required_defaults = {
+        "loss", "target_metric", "learning_rate", "weight_decay",
+        "early_stopping_patience",
+    }
+    if not isinstance(defaults, dict) or set(defaults) != required_defaults:
+        raise ValueError(
+            "training_defaults must contain exactly: "
+            + ", ".join(sorted(required_defaults))
+        )
+    if defaults["loss"] not in {"MAE", "MSE"}:
+        raise ValueError("benchmark loss must be MAE or MSE")
+    if defaults["target_metric"] not in {"MAE", "MSE", "RMSE"}:
+        raise ValueError("benchmark target_metric must be MAE, MSE or RMSE")
+    if float(defaults["learning_rate"]) <= 0 or float(defaults["weight_decay"]) < 0:
+        raise ValueError("invalid optimizer settings")
+    if int(defaults["early_stopping_patience"]) < 1:
+        raise ValueError("early_stopping_patience must be positive")
+    catalog = load_dataset_catalog()
+    if len(catalog) != 9 or any(len(entry["forecast_horizons"]) != 4 for entry in catalog.values()):
+        raise ValueError("the full benchmark requires nine datasets with four horizons each")
+    registry = load_backbone_registry()["models"]
+    benchmark_configs = []
+    for model in required_models:
+        model_config = config["models"][model]
+        if int(model_config["epochs"]) < 1 or int(model_config["batch_size"]) < 1:
+            raise ValueError(f"{model} has invalid epochs or batch_size")
+        architecture = registry[model].get("benchmark_config")
+        if not isinstance(architecture, dict):
+            raise ValueError(f"{model} has no explicit benchmark_config in the registry")
+        for parameter in (registry[model]["depth_parameter"], registry[model]["width_parameter"]):
+            if parameter not in architecture:
+                raise ValueError(f"{model} benchmark_config is missing {parameter}")
+        benchmark_configs.append(json.dumps(architecture, sort_keys=True))
+    if len(set(benchmark_configs)) != len(benchmark_configs):
+        raise ValueError("each Backbone must have a distinct explicit benchmark_config")
     return config
 
 
 def build_plan(config: dict, smoke: bool = False) -> list[BenchmarkRun]:
     catalog = load_dataset_catalog()
+    registry = load_backbone_registry()["models"]
     caps = config.get("dataset_batch_caps", {})
+    defaults = config["training_defaults"]
+    source_digests = {model: _source_digest(model) for model in config["models"]}
     plan = []
     for model, model_config in config["models"].items():
         for dataset, dataset_config in catalog.items():
@@ -65,6 +162,38 @@ def build_plan(config: dict, smoke: bool = False) -> list[BenchmarkRun]:
             epochs = 1 if smoke else int(model_config["epochs"])
             for horizon in horizons:
                 for seed in seeds:
+                    architecture = registry[model]["benchmark_config"]
+                    depth = int(architecture[registry[model]["depth_parameter"]])
+                    width = int(architecture[registry[model]["width_parameter"]])
+                    width_unit = int(registry[model]["width_unit"])
+                    if width % width_unit:
+                        raise ValueError(
+                            f"{model} benchmark width {width} is not divisible by "
+                            f"width_unit {width_unit}"
+                        )
+                    width_group = width // width_unit
+                    run_id = (
+                        f"{model}__{dataset}__h{int(horizon)}__raw"
+                        f"__d{depth}__wg{width_group}__s{int(seed)}"
+                    )
+                    data_fingerprint = _data_fingerprint(dataset)
+                    protocol = {
+                        "schema_version": PROTOCOL_SCHEMA_VERSION,
+                        "model": model,
+                        "dataset": dataset,
+                        "horizon": int(horizon),
+                        "seed": int(seed),
+                        "run_id": run_id,
+                        "epochs": epochs,
+                        "batch_size": batch_size,
+                        "training": defaults,
+                        "metric_scale": config["metric_scale"],
+                        "artifact_policy": config["artifact_policy"],
+                        "dataset_catalog": dataset_config,
+                        "data_fingerprint": data_fingerprint,
+                        "backbone": registry[model],
+                        "source_digest": source_digests[model],
+                    }
                     plan.append(
                         BenchmarkRun(
                             index=len(plan) + 1,
@@ -72,17 +201,35 @@ def build_plan(config: dict, smoke: bool = False) -> list[BenchmarkRun]:
                             dataset=dataset,
                             horizon=int(horizon),
                             seed=int(seed),
+                            run_id=run_id,
                             epochs=epochs,
                             batch_size=batch_size,
+                            loss=str(defaults["loss"]),
+                            target_metric=str(defaults["target_metric"]),
+                            learning_rate=float(defaults["learning_rate"]),
+                            weight_decay=float(defaults["weight_decay"]),
+                            early_stopping_patience=int(defaults["early_stopping_patience"]),
+                            data_fingerprint=data_fingerprint,
+                            protocol_signature=_canonical_digest(protocol),
                         )
                     )
+    expected = sum(
+        (1 if smoke else len(dataset_config["forecast_horizons"]))
+        * (1 if smoke else len(config["seeds"]))
+        for dataset_config in catalog.values()
+    ) * len(config["models"])
+    if len(plan) != expected:
+        raise RuntimeError(f"incomplete benchmark matrix: expected={expected}, actual={len(plan)}")
+    run_ids = [run.run_id for run in plan]
+    signatures = [run.protocol_signature for run in plan]
+    if len(set(run_ids)) != len(run_ids) or len(set(signatures)) != len(signatures):
+        raise RuntimeError("benchmark plan contains duplicate run IDs or protocol signatures")
     return plan
 
 
 def manifest_path(output_root: Path, run: BenchmarkRun) -> Path | None:
-    prefix = f"{run.model}__{run.dataset}__h{run.horizon}__raw"
-    matches = list(output_root.glob(f"{prefix}__d*__wg*__s{run.seed}/manifest.json"))
-    return matches[0] if len(matches) == 1 else None
+    path = output_root / run.run_id / "manifest.json"
+    return path if path.is_file() else None
 
 
 def is_complete(output_root: Path, run: BenchmarkRun, config: dict) -> bool:
@@ -90,12 +237,20 @@ def is_complete(output_root: Path, run: BenchmarkRun, config: dict) -> bool:
     if path is None:
         return False
     manifest = json.loads(path.read_text(encoding="utf-8"))
+    overall = (manifest.get("metrics") or {}).get("overall") or {}
+    try:
+        metrics_complete = all(
+            name in overall and math.isfinite(float(overall[name]))
+            for name in ("MAE", "MSE", "RMSE")
+        )
+    except (TypeError, ValueError):
+        metrics_complete = False
     return (
         manifest.get("status") == "complete"
-        and manifest.get("epochs") == run.epochs
-        and manifest.get("batch_size") == run.batch_size
-        and manifest.get("metric_scale") == config["metric_scale"]
-        and manifest.get("artifact_policy") == config["artifact_policy"]
+        and manifest.get("run_id") == run.run_id
+        and manifest.get("protocol_signature") == run.protocol_signature
+        and manifest.get("data_fingerprint") == run.data_fingerprint
+        and metrics_complete
     )
 
 
@@ -122,6 +277,13 @@ def training_command(run: BenchmarkRun, config: dict, output_root: Path, gpu: st
         "--run-index", "0",
         "--epochs", str(run.epochs),
         "--batch-size", str(run.batch_size),
+        "--loss", run.loss,
+        "--target-metric", run.target_metric,
+        "--learning-rate", str(run.learning_rate),
+        "--weight-decay", str(run.weight_decay),
+        "--early-stopping-patience", str(run.early_stopping_patience),
+        "--data-fingerprint", run.data_fingerprint,
+        "--protocol-signature", run.protocol_signature,
         "--metric-scale", config["metric_scale"],
         "--artifact-policy", config["artifact_policy"],
         "--output-root", str(output_root),

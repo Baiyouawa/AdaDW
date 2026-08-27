@@ -2,46 +2,53 @@
   "seeds": [3407, 3408, 3409],
   "metric_scale": "normalized",
   "artifact_policy": "metrics",
+  "training_defaults": {
+    "loss": "MSE",
+    "target_metric": "MSE",
+    "learning_rate": 0.0002,
+    "weight_decay": 0.0005,
+    "early_stopping_patience": 10
+  },
   "models": {
     "Crossformer": {
-      "epochs": 20,
+      "epochs": 80,
       "batch_size": 32,
-      "source": "Official Crossformer training default"
+      "source": "Project benchmark budget for Crossformer"
     },
     "PatchTST": {
       "epochs": 100,
       "batch_size": 64,
-      "source": "Official PatchTST supervised forecasting schedule"
+      "source": "Project benchmark budget for PatchTST"
     },
     "TimesNet": {
-      "epochs": 10,
+      "epochs": 80,
       "batch_size": 32,
-      "source": "Official Time-Series-Library TimesNet scripts"
+      "source": "Project benchmark budget for TimesNet"
     },
     "iTransformer": {
-      "epochs": 10,
+      "epochs": 80,
       "batch_size": 32,
-      "source": "Official iTransformer long-term forecasting scripts"
+      "source": "Project benchmark budget for iTransformer"
     },
     "TimeMixer": {
-      "epochs": 10,
+      "epochs": 80,
       "batch_size": 32,
-      "source": "Official TimeMixer long-term forecasting scripts"
+      "source": "Project benchmark budget for TimeMixer"
     },
     "WPMixer": {
-      "epochs": 10,
+      "epochs": 80,
       "batch_size": 64,
-      "source": "Official WPMixer default and unified ETT scripts"
+      "source": "Project benchmark budget for WPMixer"
     },
     "TimeFilter": {
-      "epochs": 10,
+      "epochs": 80,
       "batch_size": 32,
-      "source": "Official TimeFilter default and ETT scripts"
+      "source": "Project benchmark budget for TimeFilter"
     },
     "MultiPatchFormer": {
-      "epochs": 20,
+      "epochs": 80,
       "batch_size": 32,
-      "source": "Official MultiPatchFormer runner default"
+      "source": "Project benchmark budget for MultiPatchFormer"
     }
   },
   "dataset_batch_caps": {

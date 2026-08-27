@@ -1,0 +1,71 @@
+{
+  "dataset": "ETTh1",
+  "horizon": 96,
+  "metric": "loss_mse",
+  "epsilon": 0.0,
+  "selection_unit": "time_window",
+  "loss_aggregation": "mean_across_channels_and_seeds",
+  "models": [
+    "MultiPatchFormer",
+    "PatchTST",
+    "TimeMixer"
+  ],
+  "axes": {
+    "depth": {
+      "n_windows": 426,
+      "scope": "pooled_descriptive_only",
+      "spearman_score_capacity": -0.03716000503401543,
+      "spearman_pvalue": 0.44428074439848564
+    },
+    "width": {
+      "n_windows": 426,
+      "scope": "pooled_descriptive_only",
+      "spearman_score_capacity": 0.022984868471435906,
+      "spearman_pvalue": 0.6361625727861524
+    }
+  },
+  "per_model": {
+    "MultiPatchFormer": {
+      "depth": {
+        "n_windows": 142,
+        "spearman_score_capacity": 0.04479065374573173,
+        "spearman_pvalue": 0.5966040005577321,
+        "circular_shift_pvalue": 0.6901408450704225
+      },
+      "width": {
+        "n_windows": 142,
+        "spearman_score_capacity": -0.009788286657697877,
+        "spearman_pvalue": 0.9079594880881415,
+        "circular_shift_pvalue": 0.9507042253521126
+      }
+    },
+    "PatchTST": {
+      "depth": {
+        "n_windows": 142,
+        "spearman_score_capacity": -0.15778905855276584,
+        "spearman_pvalue": 0.060734880262882575,
+        "circular_shift_pvalue": 0.16901408450704225
+      },
+      "width": {
+        "n_windows": 142,
+        "spearman_score_capacity": 0.03829863629164053,
+        "spearman_pvalue": 0.6508993115769732,
+        "circular_shift_pvalue": 0.6267605633802817
+      }
+    },
+    "TimeMixer": {
+      "depth": {
+        "n_windows": 142,
+        "spearman_score_capacity": -0.0175376122457372,
+        "spearman_pvalue": 0.8358899421427652,
+        "circular_shift_pvalue": 0.8802816901408451
+      },
+      "width": {
+        "n_windows": 142,
+        "spearman_score_capacity": 0.03547780908795608,
+        "spearman_pvalue": 0.6750976009948633,
+        "circular_shift_pvalue": 0.6619718309859155
+      }
+    }
+  }
+}

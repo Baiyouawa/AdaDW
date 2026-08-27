@@ -21,22 +21,24 @@ M = mean(m_peak, m_band)             # 单变量画像
 ```text
 pre_experiments/results/profiles/<dataset>/windows.csv
 pre_experiments/results/profiles/<dataset>/summary.json
-pre_experiments/results/profiles/<dataset>/profile_diagnostics.pdf
+pre_experiments/results/profiles/<dataset>/U_heatmap.pdf
+pre_experiments/results/profiles/<dataset>/M_heatmap.pdf
+pre_experiments/results/profiles/<dataset>/UM_temporal_trajectory.pdf
 ```
 
-`windows.csv` 包含 `U`、`M`、六个子分量、`U_bucket` 和 `M_bucket`；`summary.json` 保存分位数、IQR、画像数量和 Spearman 相关；PDF 是围绕时间异质性设计的六面板诊断图。
+`windows.csv` 包含 `U`、`M`、六个子分量、`U_bucket` 和 `M_bucket`；`summary.json` 保存分位数、IQR、画像数量和 Spearman 相关。每个数据集分别输出 U 热力图、M 热力图和上下排列的 U/M 时间轨迹图，共 `9 x 3 = 27` 张 PDF。
 
 | 数据集 | 原始形状 | 画像窗口 | 画像通道 | 窗口/步长 | 输出 |
 | --- | ---: | ---: | ---: | ---: | --- |
-| ETTh1 | 17,420 x 7 | 512 | 7 | 96 / 24 | [PDF](profiles/ETTh1/profile_diagnostics.pdf) |
-| ETTh2 | 17,420 x 7 | 512 | 7 | 96 / 24 | [PDF](profiles/ETTh2/profile_diagnostics.pdf) |
-| ETTm1 | 69,680 x 7 | 512 | 7 | 96 / 96 | [PDF](profiles/ETTm1/profile_diagnostics.pdf) |
-| ETTm2 | 69,680 x 7 | 512 | 7 | 96 / 96 | [PDF](profiles/ETTm2/profile_diagnostics.pdf) |
-| Weather | 52,696 x 21 | 512 | 21 | 144 / 72 | [PDF](profiles/Weather/profile_diagnostics.pdf) |
-| Electricity | 26,304 x 321 | 156 | 64 | 168 / 168 | [PDF](profiles/Electricity/profile_diagnostics.pdf) |
-| ILI | 966 x 7 | 230 | 7 | 48 / 4 | [PDF](profiles/ILI/profile_diagnostics.pdf) |
-| ExchangeRate | 7,588 x 8 | 313 | 8 | 96 / 24 | [PDF](profiles/ExchangeRate/profile_diagnostics.pdf) |
-| Traffic | 17,544 x 862 | 104 | 64 | 168 / 168 | [PDF](profiles/Traffic/profile_diagnostics.pdf) |
+| ETTh1 | 17,420 x 7 | 512 | 7 | 96 / 24 | [U](profiles/ETTh1/U_heatmap.pdf) / [M](profiles/ETTh1/M_heatmap.pdf) / [U-M](profiles/ETTh1/UM_temporal_trajectory.pdf) |
+| ETTh2 | 17,420 x 7 | 512 | 7 | 96 / 24 | [U](profiles/ETTh2/U_heatmap.pdf) / [M](profiles/ETTh2/M_heatmap.pdf) / [U-M](profiles/ETTh2/UM_temporal_trajectory.pdf) |
+| ETTm1 | 69,680 x 7 | 512 | 7 | 96 / 96 | [U](profiles/ETTm1/U_heatmap.pdf) / [M](profiles/ETTm1/M_heatmap.pdf) / [U-M](profiles/ETTm1/UM_temporal_trajectory.pdf) |
+| ETTm2 | 69,680 x 7 | 512 | 7 | 96 / 96 | [U](profiles/ETTm2/U_heatmap.pdf) / [M](profiles/ETTm2/M_heatmap.pdf) / [U-M](profiles/ETTm2/UM_temporal_trajectory.pdf) |
+| Weather | 52,696 x 21 | 512 | 21 | 144 / 72 | [U](profiles/Weather/U_heatmap.pdf) / [M](profiles/Weather/M_heatmap.pdf) / [U-M](profiles/Weather/UM_temporal_trajectory.pdf) |
+| Electricity | 26,304 x 321 | 156 | 64 | 168 / 168 | [U](profiles/Electricity/U_heatmap.pdf) / [M](profiles/Electricity/M_heatmap.pdf) / [U-M](profiles/Electricity/UM_temporal_trajectory.pdf) |
+| ILI | 966 x 7 | 230 | 7 | 48 / 4 | [U](profiles/ILI/U_heatmap.pdf) / [M](profiles/ILI/M_heatmap.pdf) / [U-M](profiles/ILI/UM_temporal_trajectory.pdf) |
+| ExchangeRate | 7,588 x 8 | 313 | 8 | 96 / 24 | [U](profiles/ExchangeRate/U_heatmap.pdf) / [M](profiles/ExchangeRate/M_heatmap.pdf) / [U-M](profiles/ExchangeRate/UM_temporal_trajectory.pdf) |
+| Traffic | 17,544 x 862 | 512 | 64 | 168 / 24 | [U](profiles/Traffic/U_heatmap.pdf) / [M](profiles/Traffic/M_heatmap.pdf) / [U-M](profiles/Traffic/UM_temporal_trajectory.pdf) |
 
 Electricity 和 Traffic 是高维数据集，本轮按目录配置从 321/862 个通道中均匀选取 64 个通道。它们的结果是初始画像，不应被解读为全通道敏感性结论。
 
@@ -54,19 +56,19 @@ Electricity 和 Traffic 是高维数据集，本轮按目录配置从 321/862 �
 | Electricity | 0.269 | 0.181-0.368 | 0.094 | 0.292 | 0.186-0.430 | 0.142 | 0.328 |
 | ILI | 0.397 | 0.267-0.544 | 0.134 | 0.274 | 0.150-0.400 | 0.147 | 0.309 |
 | ExchangeRate | 0.384 | 0.263-0.508 | 0.120 | 0.421 | 0.270-0.579 | 0.166 | 0.147 |
-| Traffic | 0.240 | 0.150-0.340 | 0.097 | 0.349 | 0.234-0.455 | 0.112 | 0.179 |
+| Traffic | 0.308 | 0.191-0.435 | 0.127 | 0.345 | 0.228-0.456 | 0.115 | 0.365 |
 
 ### 3.1 主要排序
 
 - U 均值最高的是 ILI（0.397）、ExchangeRate（0.384）和 ETTh2（0.372），说明这些数据在当前窗口尺度下更需要状态更新。
-- U 均值最低的是 Traffic（0.240）和 Electricity（0.269）。二者的高维通道画像显示较低的平均局部变化，但并不等于预测任务简单，因为这里仅统计了 64 个代表通道，且 U 不是预测误差。
+- U 均值最低的是 Electricity（0.269）和 Traffic（0.308）。二者的高维通道画像显示相对较低的平均局部变化，但并不等于预测任务简单，因为这里只统计了 64 个代表通道，且 U 不是预测误差。
 - M 均值最高的是 ETTh1（0.515）、ETTh2（0.499）和 ETTm2（0.444）。Weather（0.240）和 ILI（0.274）最低，表现为相对较少的局部频谱峰或跨通道差异。
 - U/M 相关最高的是 ETTm1（0.500）和 ETTm2（0.426），表示更新需求与模式多样性在这两组 ETT 数据中有较明显共同变化，不能宣称完全正交。
-- 相关最低的是 ExchangeRate（0.147）、Traffic（0.179）和 ETTh2（0.173），这些数据更支持将 U、M 视为两个相对独立的描述轴。
+- 相关最低的是 ExchangeRate（0.147）和 ETTh2（0.173），这些数据更支持将 U、M 视为两个相对独立的描述轴。Traffic 在加密真实窗口后为 0.365，不再属于低相关数据集。
 
 ### 3.2 分桶结果
 
-每个数据集的 U 和 M 都在本数据集内部按 1/3、2/3 分位点分为 `low`、`mid`、`high`。因此桶比例被设计成接近 1/3：例如 ETTh1 每个 U/M 桶为 1,195、1,194、1,195 个，Electricity 每个桶为 3,328 个，Traffic 每个桶为 2,219、2,218、2,219 个。
+每个数据集的 U 和 M 都在本数据集内部按 1/3、2/3 分位点分为 `low`、`mid`、`high`。因此桶比例被设计成接近 1/3：例如 ETTh1 每个 U/M 桶为 1,195、1,194、1,195 个，Electricity 每个桶为 3,328 个；Traffic 的 U 分桶因边界处同值略有偏差，M 分桶仍接近等分。
 
 | 数据集 | U low | U mid | U high | M low | M mid | M high |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -78,7 +80,7 @@ Electricity 和 Traffic 是高维数据集，本轮按目录配置从 321/862 �
 | Electricity | 3,328 | 3,328 | 3,328 | 3,328 | 3,328 | 3,328 |
 | ILI | 537 | 536 | 537 | 537 | 536 | 537 |
 | ExchangeRate | 835 | 834 | 835 | 835 | 834 | 835 |
-| Traffic | 2,219 | 2,218 | 2,219 | 2,219 | 2,218 | 2,219 |
+| Traffic | 10,938 | 10,907 | 10,923 | 10,923 | 10,922 | 10,923 |
 
 这类分桶适合做同一数据集内部的容量对比，不能直接把不同数据集的 `high` 桶当作同一个绝对阈值。后续容量实验应在每个数据集内部比较高、中、低桶的饱和深度或宽度。
 
@@ -96,62 +98,47 @@ Electricity 和 Traffic 是高维数据集，本轮按目录配置从 321/862 �
 | Electricity | 0.247-0.288 | 0.065 | 0.274-0.309 | 0.036 |
 | ILI | 0.288-0.514 | 0.609 | 0.167-0.389 | 0.725 |
 | ExchangeRate | 0.327-0.448 | 0.185 | 0.314-0.525 | 0.395 |
-| Traffic | 0.221-0.260 | 0.079 | 0.322-0.374 | 0.076 |
+| Traffic | 0.240-0.373 | 0.253 | 0.316-0.370 | 0.083 |
 
 U/M 的绝对均值位于 0.2-0.4 并不意味着描述符失效：它们是多个 `[0,1]` 分量的平均值，不是概率，也没有 `0.5` 的复杂度阈值。真正支持时间异质性的证据是窗口均值随时间的变化，而不是每张图是否铺满横轴。
 
-当前结果并不支持“九个数据集的时间异质性同样强”。ILI、ETT 和部分 ExchangeRate 的窗口级变化更明显；Electricity、Traffic 和 Weather 的窗口均值较集中，主要差异可能来自通道或窗口内部结构。后续应报告窗口级 bootstrap 区间、时间分组效应量，并用容量实验检验 `U -> d_sat`、`M -> w_sat`。
+当前结果并不支持“九个数据集的时间异质性同样强”。ILI、ETT、Traffic 的 U 和部分 ExchangeRate 的窗口级变化更明显；Electricity、Weather 以及 Traffic 的 M 仍较集中，部分差异可能来自通道或窗口内部结构。后续应报告窗口级 bootstrap 区间、时间分组效应量，并用容量实验检验 `U -> d_sat`、`M -> w_sat`。
 
-## 4. PDF 六个面板的含义
+## 4. 三张 PDF 的含义
 
 本预实验要展示的是“同一数据集中，不同时间片段具有不同的状态更新程度和模式多样性”。
-因此每个 `profile_diagnostics.pdf` 现在直接把时间窗口放在横轴，并为所有数据集固定
-`U/M=[0,1]` 色标和纵轴范围，避免把每个数据集自己的最小值到最大值自动铺满画布。
+每个数据集独立输出两张时间-通道热力图和一张 U/M 时间轨迹图，便于单独排版和引用。
 
-### 左上和中上：U/M 时间-通道热图
+### U/M 时间-通道热力图
 
 - 横轴：按原始顺序排列的时间窗口，用 0%-100% 表示相对时间位置；
 - 纵轴：原始通道 ID；
 - 每个格子：一个“时间窗口 x 通道”局部单元；
-- 颜色：该局部单元的 U 或 M，所有数据集固定使用 0-1 色标。
+- 颜色：该局部单元的原始 U 或 M 分数。
 
-热图中的竖向色带表示某些时间窗口会让许多通道同时发生变化，横向色带表示某些通道长期
-保持较高或较低需求，局部亮斑则表示特定时间和特定通道的异常需求。只要沿横轴存在真实的
-颜色变化，就能直观看到局部描述符不是整套数据的常数。
+热力图使用当前“数据集 x 指标”的 2%-98% 分位数作为色阶端点，端点以外的值由色条两端
+的三角形标识。这样能避免固定 0-1 色标掩盖 Electricity、Traffic 等数据集中相对细微但真实
+的时间变化，同时仍保留 U/M 的实际数值含义。跨数据集比较时必须读取各图色条，不能直接把
+相同颜色视为相同分数。
 
-### 右上：按时间着色的 U-M 平面
+横轴刻度先落到实际窗口列，再由该列索引换算为百分比；纵轴刻度同样落在实际通道行中心。
+因此 0%、20%、...、100% 和通道标签均与对应格子的刻度线严格对齐。
 
-- 横轴：U，固定为 0-1；
-- 纵轴：M，固定为 0-1；
-- 每个点：一个局部单元；
-- 点颜色：相对时间，从早期 0 到晚期 1；
-- 黑色虚线：当前数据集 U/M 中位数。
+### 上下排列的 U/M 时间轨迹
 
-同一时期的颜色若聚集在平面的某些区域，说明 U/M 的联合状态随时间发生迁移。点云是否沿
-对角线排列则用于检查 U 和 M 是否退化为同一个分数。每个数据集最多显示 10,000 个点，
-超过时按固定随机种子抽样。
-
-### 左下和中下：U/M 时间轨迹
-
-- 横轴：相对时间窗口顺序 0-1；
-- 纵轴：U 或 M，固定为 0-1；
+- 上图：U 时间轨迹；下图：M 时间轨迹；两图共享同一组 0%-100% 时间刻度；
 - 实线：该时间窗口跨画像通道的均值；
-- 阴影：该窗口跨通道的 P10-P90 区间。
+- 阴影：该窗口跨通道的 P10-P90 区间；
+- 纵轴：U 和 M 分别使用覆盖其 P10-P90 阴影的明确数值范围。
 
-实线随时间的起伏展示总体局部需求变化；阴影宽度展示同一时刻不同通道之间的异质性。
-两者必须区分：实线变化回答“时间片段是否不同”，阴影回答“同一时间片段的通道是否不同”。
+分开的纵轴能同时展示两种指标，而不让其中较窄的波动被统一 0-1 量程压平。绝对大小应根据
+各自纵轴读数比较，不能仅凭线条的视觉振幅判断。实线变化回答“时间片段是否不同”，阴影宽度
+回答“同一时间片段的通道是否不同”。
 
-### 右下：早中晚四段箱线图
+Traffic 使用长度 168、步长 24 的重叠画像窗口，并按统一上限均匀保留 512 个真实窗口。因此其
+轨迹密度与 Weather、ETT 等长序列数据集一致，不使用绘图插值来伪造额外变化。
 
-- 横轴：按窗口顺序划分的 0-25%、25-50%、50-75%、75-100% 四个时间段；
-- 纵轴：U/M，固定为 0-1；
-- 蓝色箱：U；橙色箱：M；
-- 箱体和中线：各时间段局部单元的四分位范围和中位数；异常点不单独绘制。
-
-这个面板用于比较早期、中期和晚期分布是否整体移动。不过四等分是描述性分组；若要在论文
-中使用“证明”一词，还需要报告窗口级离散度、时间分组检验及效应量，而不能只凭肉眼看图。
-
-这些图能展示 U/M 在时间上不是常数，并定位变化发生在哪里；它们仍不能单独证明 U 应控制
+这些图能展示 U/M 在时间上是否为常数，并定位变化发生在哪里；它们仍不能单独证明 U 应控制
 深度、M 应控制宽度。后一个结论必须由 `U -> d_sat`、`M -> w_sat` 的容量实验验证。
 
 ## 5. 分数据集结论
@@ -190,12 +177,12 @@ U 均值 0.384、M 均值 0.421，rho=0.147 为最低。窗口级 U/M 时间方�
 
 ### Traffic
 
-U 均值 0.240，为九个数据集中最低；M 均值 0.349，M 高于 U，rho=0.179。画像使用 862 个通道中的 64 个代表通道和 104 个窗口；窗口级 U/M 时间方差占比仅为 0.079/0.076，当前只能说存在有限的时间变化，仍需全通道敏感性实验确认。
+U 均值 0.308、M 均值 0.345，rho=0.365。画像使用 862 个通道中的 64 个代表通道，以长度 168、步长 24 的滑动窗口均匀保留 512 个真实窗口。窗口级 U/M 时间方差占比为 0.253/0.083：加密取样后 U 的时间变化清晰，M 仍主要表现为通道或窗口内部差异；仍需全通道敏感性实验确认。
 
 ## 6. 结论与后续
 
 1. U/M 的绝对均值偏低并不自动否定描述符；但“窗口 x 通道”的非零 IQR 也不能单独证明时间异质性。
-2. 当前窗口级结果最支持 ILI、ETT 和部分 ExchangeRate 存在时间变化；Weather、Electricity、Traffic 的时间变化证据较弱。
+2. 当前窗口级结果最支持 ILI、ETT、Traffic 的 U 和部分 ExchangeRate 存在时间变化；Weather、Electricity 以及 Traffic 的 M 时间变化证据较弱。
 3. ETTm1 和 ETTm2 的 U/M 相关较高，后续需要用联合容量实验确认两个指标是否仍有独立解释力。
 4. Electricity 和 Traffic 当前只画像 64 个通道，不能替代全通道结果；应在论文实验前完成全通道敏感性检查。
 5. 本报告证明画像可计算并定位局部差异，但不能单独证明容量收益或“九个数据集都存在同等强的时间多样性”。H1-H3 仍需运行 `depth`、`width`、`joint` 容量实验，并把窗口级 U/M 与局部损失、饱和容量合并分析。

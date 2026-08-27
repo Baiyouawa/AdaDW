@@ -9,6 +9,7 @@ import os
 import shutil
 import sys
 import time
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +35,13 @@ def execute(
     batch_size: int | None = None,
     metric_scale: str = "normalized",
     artifact_policy: str = "full",
+    loss: str | None = None,
+    target_metric: str | None = None,
+    learning_rate: float | None = None,
+    weight_decay: float | None = None,
+    early_stopping_patience: int | None = None,
+    data_fingerprint: str | None = None,
+    protocol_signature: str | None = None,
 ) -> None:
     if gpu is not None:
         os.environ["CUDA_VISIBLE_DEVICES"] = gpu
@@ -52,12 +60,33 @@ def execute(
     data_path = PROJECT_ROOT / "datasets" / "processed" / run.dataset
     if not (data_path / "train_data.npy").is_file():
         raise FileNotFoundError(f"Prepare {run.dataset} first; missing {data_path / 'train_data.npy'}")
+    if data_fingerprint is not None:
+        meta_path = data_path / "meta.json"
+        if not meta_path.is_file():
+            raise FileNotFoundError(f"Re-prepare {run.dataset}; missing {meta_path}")
+        metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        actual_fingerprint = metadata.get("data_fingerprint")
+        if actual_fingerprint is None:
+            raise RuntimeError(
+                f"Re-prepare {run.dataset}; {meta_path} uses legacy metadata without "
+                "a data fingerprint."
+            )
+        if actual_fingerprint != data_fingerprint:
+            raise RuntimeError(
+                f"Processed data changed after planning {run.dataset}: "
+                f"planned={data_fingerprint}, actual={actual_fingerprint}. Rebuild the plan."
+            )
 
     output_root = output_root or PROJECT_ROOT / "pre_experiments" / "results" / "runs"
     run_dir = output_root / run.run_id
     checkpoint_dir = run_dir / "checkpoint"
     manifest = run.to_dict()
-    manifest.update(status="running", checkpoint_dir=str(checkpoint_dir))
+    manifest.update(
+        status="running",
+        checkpoint_dir=str(checkpoint_dir),
+        protocol_signature=protocol_signature,
+        data_fingerprint=data_fingerprint,
+    )
     _write_json(run_dir / "manifest.json", manifest)
 
     static_efficiency = None
@@ -84,6 +113,19 @@ def execute(
 
         run_epochs = int(epochs if epochs is not None else training["epochs"])
         run_batch_size = int(batch_size if batch_size is not None else training["batch_size"])
+        run_loss = loss or "MAE"
+        run_target_metric = target_metric or run_loss
+        run_learning_rate = float(
+            learning_rate if learning_rate is not None else training["learning_rate"]
+        )
+        run_weight_decay = float(
+            weight_decay if weight_decay is not None else training["weight_decay"]
+        )
+        run_patience = int(
+            early_stopping_patience
+            if early_stopping_patience is not None
+            else training["early_stopping_patience"]
+        )
         if metric_scale == "normalized":
             run_metrics = [
                 metric for metric in training["metrics"] if metric in {"MAE", "MSE", "RMSE"}
@@ -102,9 +144,11 @@ def execute(
             gpus=gpu,
             num_epochs=run_epochs,
             batch_size=run_batch_size,
-            optimizer_params={"lr": training["learning_rate"], "weight_decay": training["weight_decay"]},
+            loss=run_loss,
+            target_metric=run_target_metric,
+            optimizer_params={"lr": run_learning_rate, "weight_decay": run_weight_decay},
             metrics=run_metrics,
-            callbacks=[EarlyStopping(patience=training["early_stopping_patience"])],
+            callbacks=[EarlyStopping(patience=run_patience)],
             seed=run.seed,
             save_results=save_predictions,
             eval_after_train=True,
@@ -112,7 +156,7 @@ def execute(
             deterministic=True,
             cudnn_benchmark=False,
             cudnn_determinstic=True,
-            test_interval=run_epochs + 1,
+            test_interval=None,
             ckpt_save_dir=str(checkpoint_dir),
             train_data_num_workers=4,
             val_data_num_workers=4,
@@ -125,6 +169,14 @@ def execute(
             batch_size=run_batch_size,
             metric_scale=metric_scale,
             artifact_policy=artifact_policy,
+            model_config=asdict(model_config) if is_dataclass(model_config) else dict(model_config),
+            training_config={
+                "loss": run_loss,
+                "target_metric": run_target_metric,
+                "learning_rate": run_learning_rate,
+                "weight_decay": run_weight_decay,
+                "early_stopping_patience": run_patience,
+            },
         )
         _write_json(run_dir / "manifest.json", manifest)
 
@@ -176,6 +228,13 @@ def main() -> None:
     parser.add_argument("--gpu")
     parser.add_argument("--epochs", type=int, help="override configured epochs")
     parser.add_argument("--batch-size", type=int, help="override configured batch size")
+    parser.add_argument("--loss", choices=["MAE", "MSE"])
+    parser.add_argument("--target-metric", choices=["MAE", "MSE", "RMSE"])
+    parser.add_argument("--learning-rate", type=float)
+    parser.add_argument("--weight-decay", type=float)
+    parser.add_argument("--early-stopping-patience", type=int)
+    parser.add_argument("--data-fingerprint")
+    parser.add_argument("--protocol-signature")
     parser.add_argument("--output-root", type=Path, help="override run output directory")
     parser.add_argument(
         "--metric-scale", choices=["normalized", "original"], default="normalized"
@@ -191,6 +250,12 @@ def main() -> None:
         parser.error("--epochs must be positive")
     if args.batch_size is not None and args.batch_size < 1:
         parser.error("--batch-size must be positive")
+    if args.learning_rate is not None and args.learning_rate <= 0:
+        parser.error("--learning-rate must be positive")
+    if args.weight_decay is not None and args.weight_decay < 0:
+        parser.error("--weight-decay must be non-negative")
+    if args.early_stopping_patience is not None and args.early_stopping_patience < 1:
+        parser.error("--early-stopping-patience must be positive")
     runs = plan_sweep(args.model, args.dataset, args.axis, args.horizon, args.seeds)
     if args.dry_run:
         print(json.dumps([run.to_dict() for run in runs], indent=2))
@@ -208,6 +273,13 @@ def main() -> None:
             args.batch_size,
             args.metric_scale,
             args.artifact_policy,
+            args.loss,
+            args.target_metric,
+            args.learning_rate,
+            args.weight_decay,
+            args.early_stopping_patience,
+            args.data_fingerprint,
+            args.protocol_signature,
         )
 
 

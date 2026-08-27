@@ -8,10 +8,10 @@ repositories into the same `[batch, time, channel]` interface.
 | Backbone | Year | Status | Depth control | Width control |
 | --- | ---: | --- | --- | --- |
 | Crossformer | 2023 | migrated | `num_layers` | FFN `intermediate_size` |
-| PatchTST | 2023 | migrated | `num_layers` | FFN `intermediate_size` |
+| PatchTST | 2023 | migrated | `num_layers` | `hidden_size` with coupled FFN |
 | TimesNet | 2023 | migrated | `num_layers` | Inception `intermediate_size` |
 | iTransformer | 2024 | migrated | `num_layers` | FFN `intermediate_size` |
-| TimeMixer | 2024 | migrated | `num_layers` | mixing-block `intermediate_size` |
+| TimeMixer | 2024 | migrated | `num_layers` | `hidden_size` with coupled mixing FFN |
 | WPMixer | 2025 | adapted | resolution mixer blocks | mixer FFN `intermediate_size` |
 | TimeFilter | 2025 | adapted | filtered graph blocks | graph-block FFN `intermediate_size` |
 | MultiPatchFormer | 2025 | adapted | temporal/channel encoder blocks | encoder FFN `intermediate_size` |
@@ -21,6 +21,11 @@ Crossformer's `num_layers` changes multi-scale encoder/decoder structure and
 TimesNet's width changes convolutional channels, so equal integer settings do
 not imply equal FLOPs across Backbones. The sweep records actual parameters and
 profiled FLOPs for this reason.
+
+Formal RAW forecasting does not infer these settings from capacity labels. Each
+model has a complete, explicit and distinct `benchmark_config` in
+`Baselines/registry.json`. The `raw_depth/raw_width` fields retained for the
+depth/width pre-experiment are a separate capacity reference for those sweeps.
 
 ## 2025 model sources
 

@@ -539,11 +539,11 @@ class BasicTSRunner:
         self._init_train()
         self.is_train_initialized = True
         # init validation
-        if hasattr(self.cfg, "val_interval"):
+        if self.val_interval is not None:
             self._init_validation()
             self.is_val_initialized = True
 
-        if hasattr(self.cfg, "test_interval"):
+        if self.test_interval is not None:
             self._init_test()
             self.is_test_initialized = True
 

@@ -12,7 +12,19 @@
       "width_parameter": "intermediate_size",
       "raw_depth": 2,
       "raw_width": 2048,
-      "width_unit": 256
+      "width_unit": 256,
+      "benchmark_config": {
+        "num_layers": 2,
+        "hidden_size": 512,
+        "win_size": 2,
+        "factor": 10,
+        "patch_len": 16,
+        "n_heads": 8,
+        "intermediate_size": 2048,
+        "hidden_act": "gelu",
+        "dropout": 0.05,
+        "baseline": false
+      }
     },
     "PatchTST": {
       "year": 2023,
@@ -36,6 +48,27 @@
         "head_dropout": 0.0,
         "patch_len": 16,
         "patch_stride": 8
+      },
+      "benchmark_config": {
+        "num_layers": 1,
+        "hidden_size": 256,
+        "n_heads": 1,
+        "intermediate_size": 1024,
+        "hidden_act": "gelu",
+        "attn_dropout": 0.1,
+        "fc_dropout": 0.1,
+        "head_dropout": 0.0,
+        "patch_len": 16,
+        "patch_stride": 8,
+        "padding": true,
+        "norm_type": "layer_norm",
+        "individual_head": false,
+        "use_revin": true,
+        "affine": true,
+        "subtract_last": false,
+        "decomp": false,
+        "moving_avg": 25,
+        "output_attentions": false
       }
     },
     "TimesNet": {
@@ -48,7 +81,16 @@
       "width_parameter": "intermediate_size",
       "raw_depth": 1,
       "raw_width": 1024,
-      "width_unit": 128
+      "width_unit": 128,
+      "benchmark_config": {
+        "num_layers": 1,
+        "hidden_size": 256,
+        "intermediate_size": 1024,
+        "num_kernels": 3,
+        "dropout": 0.1,
+        "top_k": 5,
+        "use_timestamps": true
+      }
     },
     "iTransformer": {
       "year": 2024,
@@ -60,7 +102,17 @@
       "width_parameter": "intermediate_size",
       "raw_depth": 1,
       "raw_width": 1024,
-      "width_unit": 128
+      "width_unit": 128,
+      "benchmark_config": {
+        "num_layers": 1,
+        "hidden_size": 256,
+        "n_heads": 1,
+        "intermediate_size": 1024,
+        "hidden_act": "gelu",
+        "dropout": 0.1,
+        "use_revin": true,
+        "output_attentions": false
+      }
     },
     "TimeMixer": {
       "year": 2024,
@@ -81,6 +133,22 @@
         "down_sampling_layers": 3,
         "down_sampling_window": 2,
         "down_sampling_method": "avg"
+      },
+      "benchmark_config": {
+        "num_layers": 1,
+        "hidden_size": 256,
+        "intermediate_size": 1024,
+        "hidden_act": "gelu",
+        "dropout": 0.1,
+        "down_sampling_layers": 3,
+        "down_sampling_window": 2,
+        "down_sampling_method": "avg",
+        "channel_independence": true,
+        "use_revin": true,
+        "decomp_method": "moving_avg",
+        "moving_avg": 25,
+        "top_k": 5,
+        "use_timestamps": false
       }
     },
     "WPMixer": {
@@ -94,6 +162,15 @@
       "raw_depth": 2,
       "raw_width": 1024,
       "width_unit": 128,
+      "benchmark_config": {
+        "num_layers": 2,
+        "hidden_size": 256,
+        "intermediate_size": 1024,
+        "wavelet_level": 2,
+        "patch_len": 4,
+        "patch_stride": 2,
+        "dropout": 0.1
+      },
       "source_repository": "Secure-and-Intelligent-Systems-Lab/WPMixer",
       "source_commit": "74104c9dddd54d279eb8323f48934b4fd75fcae7",
       "paper": "https://arxiv.org/abs/2412.17176"
@@ -109,6 +186,14 @@
       "raw_depth": 2,
       "raw_width": 256,
       "width_unit": 64,
+      "benchmark_config": {
+        "num_layers": 2,
+        "hidden_size": 128,
+        "intermediate_size": 256,
+        "n_heads": 4,
+        "keep_ratio": 0.5,
+        "dropout": 0.1
+      },
       "source_repository": "TROUBADOUR000/TimeFilter",
       "source_commit": "dffde87e4fff0fdeeebbacde03dc1e432e15b3a1",
       "paper": "https://arxiv.org/abs/2501.13041"
@@ -128,6 +213,16 @@
       "depth_candidates": [1, 2, 3, 4, 5],
       "width_group_candidates": [1, 2, 4, 8, 16],
       "width_unit": 64,
+      "benchmark_config": {
+        "num_layers": 1,
+        "hidden_size": 256,
+        "intermediate_size": 512,
+        "n_heads": 8,
+        "patch_lengths": [8, 16, 24, 32],
+        "patch_strides": [8, 8, 7, 6],
+        "prediction_segments": 8,
+        "dropout": 0.2
+      },
       "source_repository": "bioinfoUQAM/MultiPatchFormer",
       "source_commit": "965e6bd60822d509183253ef9c51fc3f9efe23f3",
       "paper": "https://www.nature.com/articles/s41598-024-82417-4"

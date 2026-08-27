@@ -1,9 +1,14 @@
-# Eight-Backbone Forecasting Smoke Test
+# Historical Eight-Backbone Forecasting Smoke Test
 
 All eight registered Backbones completed a real train/validation/test cycle on
 ILI using input length 24, prediction length 24, seed 42, one epoch and batch
 size 8. This is an integration check, not a benchmark: one epoch is insufficient
 for comparing model accuracy.
+
+This record predates the current protocol signatures and explicit RAW
+`benchmark_config` separation. It proves only that the eight adapter paths once
+completed on ILI; it must not be used as evidence for all nine datasets or the
+current 864-run protocol.
 
 The runs were written outside the formal result tree to
 `/tmp/adawd-eight-smoke`. Every run produced a best checkpoint,

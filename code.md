@@ -335,14 +335,14 @@ actual_width = width_group * model.width_unit
 
 | 模型 | Epoch | 默认 Batch |
 | --- | ---: | ---: |
-| Crossformer | 20 | 32 |
+| Crossformer | 80 | 32 |
 | PatchTST | 100 | 64 |
-| TimesNet | 10 | 32 |
-| iTransformer | 10 | 32 |
-| TimeMixer | 10 | 32 |
-| WPMixer | 10 | 64 |
-| TimeFilter | 10 | 32 |
-| MultiPatchFormer | 20 | 32 |
+| TimesNet | 80 | 32 |
+| iTransformer | 80 | 32 |
+| TimeMixer | 80 | 32 |
+| WPMixer | 80 | 64 |
+| TimeFilter | 80 | 32 |
+| MultiPatchFormer | 80 | 32 |
 
 Electricity 的 batch size 最多为 16，Traffic 最多为 8。三个正式种子为
 `3407/3408/3409`。
@@ -605,12 +605,12 @@ Electricity、Traffic 和 Weather 的窗口均值变化较弱，主要差异可�
 
 ### 6.2 从统一容量值构造模型
 
-`build_model()` 根据注册表动态导入模型和配置类，并注入：
+`build_model()` 根据注册表动态导入模型和配置类。正式 `raw` 运行完整注入该模型独立的
+`benchmark_config`；深度/宽度容量运行则注入：
 
 ```text
 input_len, output_len, num_features,
-num_layers=run.depth,
-intermediate_size=run.width
+模型对应的 depth 参数与 width 参数
 ```
 
 TimesNet 额外启用 timestamp；TimeFilter 根据数据集设置 patch length。所有模型最终都必须
@@ -629,12 +629,12 @@ TimesNet 额外启用 timestamp；TimeFilter 根据数据集设置 patch length�
 2. 构造一个未训练模型，测参数量、推理延迟、吞吐量、峰值显存和可支持时的 FLOPs；
 3. 建立 `BasicTSForecastingConfig`；
 4. 使用 BasicTS 训练，并在每个 epoch 后验证；
-5. 依据验证集 MAE 保存最佳 checkpoint，早停耐心为 10；
+5. 正式 benchmark 依据验证集 MSE 保存最佳 checkpoint；容量 pilot 默认依据 MAE，早停耐心为 10；
 6. 训练结束后重新加载最佳 checkpoint，在 test split 上评估；
 7. 读取 `test_metrics.json`，把指标与效率写回 manifest；
 8. 成功则记为 `complete`，异常则记为 `failed`。
 
-训练 loss 默认是 masked MAE。评价指标由 `metric_scale` 控制：`normalized` 只计算
+正式 benchmark 的训练 loss 是 masked MSE；容量入口未覆盖时仍默认 masked MAE。评价指标由 `metric_scale` 控制：`normalized` 只计算
 MAE/MSE/RMSE，`original` 计算配置中的 MAE/MSE/RMSE/MAPE/WAPE。`artifact_policy` 不控制
 指标种类，只控制是否保留预测数组和 checkpoint。当前容量一键任务和正式 benchmark 都未
 覆盖默认的 `metric_scale=normalized`，因此实际记录 MAE/MSE/RMSE。
@@ -1091,8 +1091,8 @@ loss/metric 按有效 target 元素数加权，不是简单对 batch 均值再�
 ### 14.2 test 曲线
 
 一般 BasicTS 可以按 `test_interval` 在训练中写 test 曲线，横轴是 test 发生时的 epoch 记录。
-但本仓库在 `run_capacity_sweep.py` 中把 `test_interval` 设为 `run_epochs + 1`，目的是避免训练
-过程中反复看 test set。最终只在训练完成后加载最佳模型评估；此时不会按 epoch 写一条正式
+本仓库在 `run_capacity_sweep.py` 中把 `test_interval` 设为 `None`，训练期间不会构建或遍历
+test loader。最终只在训练完成后加载最佳模型评估；此时不会按 epoch 写一条正式
 test TensorBoard 曲线，最终 test 指标以 `test_metrics.json/manifest.json` 为准。
 
 ### 14.3 TensorBoard 文件是否保留

@@ -137,7 +137,7 @@
     "forecast_input_length": 96,
     "forecast_horizons": [96, 192, 336, 720],
     "profile_window": 168,
-    "profile_stride": 168,
+    "profile_stride": 24,
     "max_profile_channels": 64
   }
 }

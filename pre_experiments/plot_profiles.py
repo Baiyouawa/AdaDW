@@ -1,167 +1,235 @@
 #!/usr/bin/env python3
-"""Plot temporal U/M heterogeneity for one profile table."""
+"""Plot separate temporal U/M profile figures for one dataset."""
 
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 import numpy as np
 import pandas as pd
+
+
+SCORE_STYLES = {
+    "U": {"color": "#167D8D", "cmap": "viridis"},
+    "M": {"color": "#C94F2D", "cmap": "magma"},
+}
+
+
+def _even_index_ticks(length: int, maximum: int) -> np.ndarray:
+    """Return unique integer tick positions spanning all indexed values."""
+    if length <= 1:
+        return np.array([0], dtype=int)
+    return np.unique(
+        np.rint(np.linspace(0, length - 1, min(maximum, length))).astype(int)
+    )
+
+
+def _relative_labels(positions: np.ndarray, length: int) -> list[str]:
+    denominator = max(length - 1, 1)
+    return [f"{position / denominator:.0%}" for position in positions]
+
+
+def _robust_color_limits(values: np.ndarray) -> tuple[float, float]:
+    finite = np.asarray(values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return 0.0, 1.0
+
+    lower, upper = np.quantile(finite, [0.02, 0.98])
+    if upper - lower < 0.02:
+        midpoint = (lower + upper) / 2.0
+        lower, upper = midpoint - 0.01, midpoint + 0.01
+    return max(0.0, float(lower)), min(1.0, float(upper))
+
+
+def _trajectory_limits(lower: np.ndarray, upper: np.ndarray) -> tuple[float, float]:
+    low = float(np.nanmin(lower))
+    high = float(np.nanmax(upper))
+    span = max(high - low, 0.05)
+    padding = 0.08 * span
+    return max(0.0, low - padding), min(1.0, high + padding)
+
+
+def _format_channel(channel: object) -> str:
+    if isinstance(channel, (float, np.floating)) and float(channel).is_integer():
+        return str(int(channel))
+    return str(channel)
+
+
+def _save_figure(figure: plt.Figure, output: Path) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output, dpi=300, bbox_inches="tight")
+    plt.close(figure)
+
+
+def _plot_heatmap(
+    frame: pd.DataFrame,
+    dataset: str,
+    score: str,
+    window_count: int,
+    output: Path,
+) -> None:
+    table = frame.pivot_table(
+        index="channel", columns="window_index", values=score, aggfunc="mean"
+    ).sort_index()
+    values = table.to_numpy(dtype=float)
+    vmin, vmax = _robust_color_limits(values)
+    color_map = plt.get_cmap(SCORE_STYLES[score]["cmap"]).copy()
+    color_map.set_bad("#D9D9D9")
+
+    figure, axis = plt.subplots(figsize=(8.2, 4.8), constrained_layout=True)
+    image = axis.imshow(
+        np.ma.masked_invalid(values),
+        aspect="auto",
+        interpolation="nearest",
+        cmap=color_map,
+        vmin=vmin,
+        vmax=vmax,
+    )
+
+    x_ticks = _even_index_ticks(window_count, maximum=6)
+    y_ticks = _even_index_ticks(len(table.index), maximum=9)
+    axis.set_xticks(x_ticks, labels=_relative_labels(x_ticks, window_count))
+    axis.set_yticks(
+        y_ticks,
+        labels=[_format_channel(table.index[position]) for position in y_ticks],
+    )
+    axis.set_xlim(-0.5, window_count - 0.5)
+    axis.set_ylim(len(table.index) - 0.5, -0.5)
+    axis.set(
+        xlabel="Relative time-window order",
+        ylabel="Channel",
+        title=f"{dataset}: {score} across channels and time windows",
+    )
+    axis.tick_params(direction="out", length=4, width=0.8)
+
+    color_bar = figure.colorbar(image, ax=axis, pad=0.025, extend="both")
+    color_bar.set_label(f"{score} score")
+    color_bar.locator = ticker.LinearLocator(5)
+    color_bar.formatter = ticker.FormatStrFormatter("%.2f")
+    color_bar.update_ticks()
+    _save_figure(figure, output)
+
+
+def _plot_temporal_trajectories(
+    window_summary: pd.DataFrame,
+    dataset: str,
+    output: Path,
+) -> None:
+    window_count = len(window_summary)
+    relative_time = np.linspace(0.0, 1.0, max(window_count, 1))
+    figure, axes = plt.subplots(
+        2,
+        1,
+        figsize=(8.2, 6.4),
+        sharex=True,
+        constrained_layout=True,
+    )
+
+    for axis, score in zip(axes, ("U", "M")):
+        style = SCORE_STYLES[score]
+        mean = window_summary[f"{score}_mean"].to_numpy(dtype=float)
+        p10 = window_summary[f"{score}_p10"].to_numpy(dtype=float)
+        p90 = window_summary[f"{score}_p90"].to_numpy(dtype=float)
+        axis.fill_between(
+            relative_time,
+            p10,
+            p90,
+            color=style["color"],
+            alpha=0.18,
+            linewidth=0,
+            label="P10-P90 across channels",
+        )
+        axis.plot(
+            relative_time,
+            mean,
+            color=style["color"],
+            linewidth=1.6,
+            label="Window mean",
+        )
+        axis.set_ylim(*_trajectory_limits(p10, p90))
+        axis.set_ylabel(f"{score} score")
+        axis.set_title(f"{score} temporal trajectory", loc="left", fontsize=11)
+        axis.yaxis.set_major_locator(ticker.MaxNLocator(nbins=5, min_n_ticks=4))
+        axis.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
+        axis.grid(axis="y", color="#B8B8B8", linewidth=0.6, alpha=0.45)
+        axis.tick_params(direction="out", length=4, width=0.8)
+        axis.legend(loc="best", fontsize=8, frameon=False)
+
+    x_ticks = np.linspace(0.0, 1.0, 6)
+    axes[-1].set_xticks(x_ticks, labels=[f"{value:.0%}" for value in x_ticks])
+    axes[-1].set_xlim(0.0, 1.0)
+    axes[-1].set_xlabel("Relative time-window order")
+    figure.suptitle(f"{dataset}: temporal U/M trajectories", fontsize=13)
+    _save_figure(figure, output)
+
+
+def plot_profiles(profiles: Path, output_dir: Path | None = None) -> list[Path]:
+    frame = pd.read_csv(profiles)
+    required = {"U", "M", "channel", "segment", "window_start"}
+    if not required.issubset(frame.columns):
+        raise ValueError(f"Profile table is missing: {sorted(required - set(frame.columns))}")
+    if frame.empty:
+        raise ValueError("Profile table is empty")
+
+    dataset = str(frame["dataset"].iloc[0]) if "dataset" in frame else profiles.stem
+    windows = frame[["segment", "window_start"]].drop_duplicates().reset_index(drop=True)
+    windows["window_index"] = np.arange(len(windows), dtype=int)
+    frame = frame.merge(
+        windows,
+        on=["segment", "window_start"],
+        how="left",
+        validate="many_to_one",
+    )
+    window_count = len(windows)
+    window_summary = (
+        frame.groupby("window_index", sort=True)
+        .agg(
+            U_mean=("U", "mean"),
+            U_p10=("U", lambda values: values.quantile(0.1)),
+            U_p90=("U", lambda values: values.quantile(0.9)),
+            M_mean=("M", "mean"),
+            M_p10=("M", lambda values: values.quantile(0.1)),
+            M_p90=("M", lambda values: values.quantile(0.9)),
+        )
+        .reindex(np.arange(window_count))
+    )
+
+    destination = output_dir or profiles.parent
+    outputs = [
+        destination / "U_heatmap.pdf",
+        destination / "M_heatmap.pdf",
+        destination / "UM_temporal_trajectory.pdf",
+    ]
+    with plt.rc_context(
+        {
+            "font.family": "DejaVu Serif",
+            "font.size": 10,
+            "axes.linewidth": 0.8,
+            "pdf.fonttype": 42,
+        }
+    ):
+        _plot_heatmap(frame, dataset, "U", window_count, outputs[0])
+        _plot_heatmap(frame, dataset, "M", window_count, outputs[1])
+        _plot_temporal_trajectories(window_summary, dataset, outputs[2])
+    return outputs
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profiles", required=True, type=Path)
-    parser.add_argument("--output", type=Path)
-    parser.add_argument("--max-points", type=int, default=10000)
+    parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args()
-    frame = pd.read_csv(args.profiles)
-    required = {"U", "M", "U_bucket", "M_bucket"}
-    if not required.issubset(frame.columns):
-        raise ValueError(f"Profile table is missing: {sorted(required - set(frame.columns))}")
-    dataset = frame["dataset"].iloc[0] if "dataset" in frame else args.profiles.stem
 
-    # A profile row is one channel inside one rolling window. Preserve the
-    # generated segment/window order and attach a stable temporal index.
-    window_columns = ["segment", "window_start"]
-    windows = frame[window_columns].drop_duplicates().reset_index(drop=True)
-    windows["window_index"] = np.arange(len(windows), dtype=int)
-    frame = frame.merge(windows, on=window_columns, how="left", validate="many_to_one")
-    window_count = len(windows)
-    relative_time = np.linspace(0.0, 1.0, max(window_count, 1))
-
-    figure, axes = plt.subplots(2, 3, figsize=(16, 8.5), constrained_layout=True)
-
-    heatmaps = []
-    for axis, score, title, cmap in (
-        (axes[0, 0], "U", "U by channel and time window", "viridis"),
-        (axes[0, 1], "M", "M by channel and time window", "magma"),
-    ):
-        table = frame.pivot_table(
-            index="channel", columns="window_index", values=score, aggfunc="mean"
-        ).sort_index()
-        image = axis.imshow(
-            table.to_numpy(),
-            aspect="auto",
-            interpolation="nearest",
-            cmap=cmap,
-            vmin=0.0,
-            vmax=1.0,
-        )
-        heatmaps.append(image)
-        axis.set(
-            xlabel="Relative time-window order",
-            ylabel="Channel",
-            title=title,
-            xlim=(-0.5, max(window_count - 0.5, 0.5)),
-        )
-        tick_count = min(6, max(window_count, 1))
-        tick_positions = np.linspace(0, max(window_count - 1, 0), tick_count)
-        axis.set_xticks(tick_positions)
-        axis.set_xticklabels([f"{value:.0%}" for value in np.linspace(0, 1, tick_count)])
-        channels = table.index.to_numpy()
-        channel_ticks = np.linspace(0, max(len(channels) - 1, 0), min(8, len(channels)))
-        axis.set_yticks(channel_ticks)
-        axis.set_yticklabels([str(channels[int(round(pos))]) for pos in channel_ticks])
-
-    # Color the joint plane by temporal position instead of by a high-score
-    # bucket. This makes the time dependence visible in the U-M relationship.
-    sample = frame.sample(min(args.max_points, len(frame)), random_state=42)
-    colors = sample["window_index"].to_numpy() / max(window_count - 1, 1)
-    scatter = axes[0, 2].scatter(
-        sample["U"], sample["M"], s=8, c=colors, cmap="plasma", vmin=0.0, vmax=1.0,
-        alpha=0.45, linewidths=0,
-    )
-    axes[0, 2].axvline(frame["U"].median(), color="black", linewidth=0.8, linestyle="--")
-    axes[0, 2].axhline(frame["M"].median(), color="black", linewidth=0.8, linestyle="--")
-    axes[0, 2].set(
-        xlabel="U: state-update demand",
-        ylabel="M: pattern diversity",
-        title="U-M plane colored by relative time",
-        xlim=(0.0, 1.0),
-        ylim=(0.0, 1.0),
-    )
-
-    window_summary = frame.groupby("window_index", sort=True).agg(
-        U_mean=("U", "mean"),
-        U_p10=("U", lambda values: values.quantile(0.1)),
-        U_p90=("U", lambda values: values.quantile(0.9)),
-        M_mean=("M", "mean"),
-        M_p10=("M", lambda values: values.quantile(0.1)),
-        M_p90=("M", lambda values: values.quantile(0.9)),
-    )
-    for axis, score, color, title in (
-        (axes[1, 0], "U", "#167D8D", "Temporal U trajectory"),
-        (axes[1, 1], "M", "#D15C32", "Temporal M trajectory"),
-    ):
-        axis.fill_between(
-            relative_time,
-            window_summary[f"{score}_p10"],
-            window_summary[f"{score}_p90"],
-            color=color,
-            alpha=0.16,
-            label="P10-P90 across channels",
-        )
-        axis.plot(
-            relative_time,
-            window_summary[f"{score}_mean"],
-            color=color,
-            linewidth=1.5,
-            label="window mean",
-        )
-        axis.set(
-            xlabel="Relative time-window order",
-            ylabel=f"{score} score (0-1)",
-            title=title,
-            xlim=(0.0, 1.0),
-            ylim=(0.0, 1.0),
-        )
-        axis.legend(loc="best", fontsize=8, frameon=False)
-
-    # Compare early, middle and late portions on one fixed score scale.
-    frame["time_quartile"] = np.minimum(
-        (frame["window_index"].to_numpy() * 4) // max(window_count, 1), 3
-    )
-    positions = np.arange(4)
-    u_values = [frame.loc[frame["time_quartile"] == q, "U"] for q in range(4)]
-    m_values = [frame.loc[frame["time_quartile"] == q, "M"] for q in range(4)]
-    first = axes[1, 2].boxplot(
-        u_values, positions=positions - 0.17, widths=0.28, patch_artist=True,
-        showfliers=False, boxprops={"facecolor": "#167D8D", "alpha": 0.55},
-        medianprops={"color": "black"},
-    )
-    second = axes[1, 2].boxplot(
-        m_values, positions=positions + 0.17, widths=0.28, patch_artist=True,
-        showfliers=False, boxprops={"facecolor": "#D15C32", "alpha": 0.55},
-        medianprops={"color": "black"},
-    )
-    axes[1, 2].plot([], [], color="#167D8D", linewidth=7, alpha=0.55, label="U")
-    axes[1, 2].plot([], [], color="#D15C32", linewidth=7, alpha=0.55, label="M")
-    axes[1, 2].set(
-        xlabel="Temporal quartile (early -> late)",
-        ylabel="Score (0-1)",
-        title="Score shift across time",
-        xticks=positions,
-        xticklabels=["0-25%", "25-50%", "50-75%", "75-100%"],
-        xlim=(-0.6, 3.6),
-        ylim=(0.0, 1.0),
-    )
-    axes[1, 2].legend(loc="best", fontsize=8, frameon=False)
-
-    figure.colorbar(
-        heatmaps[0], ax=[axes[0, 0], axes[0, 1]], shrink=0.82,
-        label="U/M score (fixed 0-1 scale)",
-    )
-    figure.colorbar(scatter, ax=axes[0, 2], shrink=0.82, label="Relative time")
-    figure.suptitle(f"{dataset}: temporal heterogeneity of local descriptors", fontsize=13)
-
-    output = args.output or args.profiles.with_name("profile_diagnostics.pdf")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(output, dpi=300)
-    plt.close(figure)
-    print(output)
+    for output in plot_profiles(args.profiles, args.output_dir):
+        print(output)
 
 
 if __name__ == "__main__":

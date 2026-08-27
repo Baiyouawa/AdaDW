@@ -103,7 +103,18 @@ def plan_sweep(
     raw_group = int(entry["raw_width"] // entry["width_unit"])
 
     if axis == "raw":
-        pairs = [(entry["raw_depth"], raw_group)]
+        benchmark = entry.get("benchmark_config")
+        if not isinstance(benchmark, dict):
+            raise ValueError(f"{model_name} has no explicit benchmark_config")
+        raw_depth = int(benchmark[entry["depth_parameter"]])
+        raw_width = int(benchmark[entry["width_parameter"]])
+        if raw_width % int(entry["width_unit"]):
+            raise ValueError(
+                f"{model_name} benchmark width {raw_width} is not divisible by "
+                f"width_unit {entry['width_unit']}"
+            )
+        raw_group = raw_width // int(entry["width_unit"])
+        pairs = [(raw_depth, raw_group)]
     elif axis == "depth":
         pairs = [(depth, raw_group) for depth in capacity_candidates(model_name, "depth")]
     elif axis == "width":
@@ -131,7 +142,9 @@ def plan_sweep(
             width_group=int(group),
             width=int(group * entry["width_unit"]),
             coupled_width=(
-                int(group * entry["width_unit"] * entry["coupled_width_ratio"])
+                int(entry["benchmark_config"][entry["coupled_width_parameter"]])
+                if axis == "raw" and "coupled_width_parameter" in entry
+                else int(group * entry["width_unit"] * entry["coupled_width_ratio"])
                 if "coupled_width_parameter" in entry
                 else None
             ),
@@ -161,12 +174,15 @@ def build_model(run: SweepRun) -> Tuple[type, Any, bool]:
         "input_len": run.input_length,
         "output_len": run.output_length,
         "num_features": dataset["expected_channels"],
-        **entry.get("fixed_config", {}),
-        entry["depth_parameter"]: run.depth,
-        entry["width_parameter"]: run.width,
     }
-    if "coupled_width_parameter" in entry:
-        kwargs[entry["coupled_width_parameter"]] = run.coupled_width
+    if run.axis == "raw":
+        kwargs.update(entry["benchmark_config"])
+    else:
+        kwargs.update(entry.get("fixed_config", {}))
+        kwargs[entry["depth_parameter"]] = run.depth
+        kwargs[entry["width_parameter"]] = run.width
+        if "coupled_width_parameter" in entry:
+            kwargs[entry["coupled_width_parameter"]] = run.coupled_width
     use_timestamps = run.model == "TimesNet"
     if run.model == "TimesNet":
         kwargs.update(use_timestamps=True, timestamp_sizes=timestamp_sizes(run.dataset))

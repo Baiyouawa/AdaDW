@@ -11,12 +11,16 @@ M_i = mean(m_peak, m_band, m_channel)          # multivariate
 M_i = mean(m_peak, m_band)                     # univariate
 ```
 
-`profile_dataset.py` writes `windows.csv` and `summary.json`. The required
-diagnostics are fixed-scale U/M time-channel heatmaps, window-level temporal
-trajectories, temporal-quartile box plots, a time-colored U-by-M scatter plot,
-P10/P50/P90, within-dataset low/mid/high buckets, and the U/M Spearman
-correlation. A narrow window-level spread or nearly perfect U/M correlation is
-a failed descriptor diagnostic, not a positive result. Absolute U/M means are
+`profile_dataset.py` writes `windows.csv` and `summary.json`. The visual
+diagnostics are exported as three publication-ready figures per dataset: a U
+time-channel heatmap, an M time-channel heatmap, and a two-panel U/M temporal
+trajectory figure. Heatmaps use dataset-specific 2nd-98th percentile color
+limits so temporal contrast remains visible while the color bars still report
+the original score values. The trajectory panels report the window mean and
+P10-P90 across channels on aligned relative-time ticks. Traffic uses a
+one-day profile stride (24 hourly samples) and the shared 512-window cap so its
+trajectory has the same real-window density as the other long datasets. A
+narrow window-level spread is not a positive result. Absolute U/M means are
 not probabilities and have no universal 0.5 threshold.
 
 Electricity and Traffic are extremely wide. Their catalog entries use a
@@ -55,18 +59,20 @@ local unit and requires all capacity candidates for that same unit.
 
 ## 3. RAW and efficiency records
 
-Every executed run stores its manifest, five forecasting metrics, predictions,
-targets, per-window MAE/MSE, total/trainable parameters, profiler FLOPs, training
-wall time, inference latency (median and P90), throughput, and CUDA peak memory
-where available. FLOPs may be null when an operator is unsupported; that is
-reported rather than replaced by a parameter-count proxy.
+Capacity runs with `artifact_policy=full` store a manifest, configured metrics,
+predictions, targets, per-window MAE/MSE and efficiency records. Formal RAW runs
+use `artifact_policy=metrics`: they keep normalized MAE/MSE/RMSE and efficiency
+metadata, then remove checkpoints and prediction arrays. FLOPs may be null when
+an operator is unsupported; that is reported rather than replaced by a
+parameter-count proxy.
 
 ## 4. Full forecasting benchmark
 
 `run_forecasting_benchmarks.py` builds the Cartesian product of all eight
 registered Backbones, all nine forecasting datasets, each dataset's four
 catalog horizons, and seeds 3407/3408/3409. Model-specific epoch and batch
-settings are recorded in `benchmark_config.json`. The runner is resumable and
+settings are recorded in `benchmark_config.json`; distinct architecture settings
+are explicit in `Baselines/registry.json`. The runner is resumable and
 supports `--start-index`/`--stop-index` for scheduling subsets of `plan.csv`.
 
 The benchmark uses normalized MAE/MSE/RMSE and `artifact_policy=metrics`.
@@ -75,9 +81,11 @@ deleted after their metrics are copied into the run manifest. The summary tool
 produces per-seed values, mean/sample-standard-deviation tables, coverage, and
 a Markdown report.
 
-The current environment has no raw data and no PyTorch installation, so only
-planning and data-analysis code can run here. `--dry-run` validates experiment
-coverage without launching training.
+Every planned run carries a data fingerprint and protocol signature. Resume and
+summary operations require an exact signature match, so results from changed
+data, architecture or training code are not silently reused. The formal matrix
+is still 0/864 complete; static coverage is not evidence that every combination
+has passed a runtime smoke test.
 
 ## Fairness notes
 

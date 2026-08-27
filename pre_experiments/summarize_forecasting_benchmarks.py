@@ -30,13 +30,16 @@ def collect_runs(runs_root: Path) -> pd.DataFrame:
             "epochs": int(manifest["epochs"]),
             "batch_size": int(manifest["batch_size"]),
             "metric_scale": manifest.get("metric_scale", "unknown"),
+            "protocol_signature": manifest.get("protocol_signature"),
+            "data_fingerprint": manifest.get("data_fingerprint"),
             "run_id": manifest["run_id"],
         }
         row.update({name: float(value) for name, value in overall.items()})
         rows.append(row)
     columns = [
         "model", "dataset", "output_length", "seed", "epochs", "batch_size",
-        "metric_scale", "run_id", "MAE", "MSE", "RMSE",
+        "metric_scale", "protocol_signature", "data_fingerprint", "run_id",
+        "MAE", "MSE", "RMSE",
     ]
     return pd.DataFrame(rows, columns=columns)
 
@@ -74,14 +77,30 @@ def coverage(plan: pd.DataFrame, runs: pd.DataFrame) -> pd.DataFrame:
 
 
 def filter_runs_to_plan(runs: pd.DataFrame, plan: pd.DataFrame) -> pd.DataFrame:
+    required = {
+        "model", "dataset", "horizon", "seed", "epochs", "batch_size",
+        "run_id", "protocol_signature", "data_fingerprint",
+    }
+    missing = sorted(required - set(plan.columns))
+    if missing:
+        raise ValueError(
+            "Legacy or incomplete plan; regenerate it with the current benchmark runner. "
+            f"Missing columns: {missing}"
+        )
     if runs.empty:
         return runs
     planned = plan.rename(columns={"horizon": "output_length"})[
-        ["model", "dataset", "output_length", "seed", "epochs", "batch_size"]
+        [
+            "model", "dataset", "output_length", "seed", "epochs", "batch_size",
+            "run_id", "protocol_signature", "data_fingerprint",
+        ]
     ]
     return runs.merge(
         planned,
-        on=["model", "dataset", "output_length", "seed", "epochs", "batch_size"],
+        on=[
+            "model", "dataset", "output_length", "seed", "epochs", "batch_size",
+            "run_id", "protocol_signature", "data_fingerprint",
+        ],
         how="inner",
         validate="one_to_one",
     )
